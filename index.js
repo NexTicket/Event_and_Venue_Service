@@ -23,7 +23,7 @@ app.get("/", async (req, res) => {
   res
     .status(200)
     .json({ message: "Supabase connected successfully!", sample: data });
-  
+
   console.log("Supabase connected successfully");
 
   // res.status(200).json({
