@@ -21,4 +21,22 @@ export const getAllVenues = async (req: Request, res: Response) => {
     }
 }
 
+export const addVenue = async (req: Request, res: Response) => {
+    const {name, seatMap, tenantId} = req.body;
+    try{
+        const newVenue = await prisma.venue.create({
+            data: {name, seatMap, tenantId},
+        });
+        res.status(201).json({
+            data: newVenue,
+            message: "Venue added successfully",
+        });
+
+    }catch(error){
+        console.error('Failed to add venue:', error);
+        res.status(500).json({ error: 'Internal server error' });
+
+    }
+}
+
 
