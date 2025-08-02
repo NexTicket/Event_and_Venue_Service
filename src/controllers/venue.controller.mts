@@ -39,4 +39,23 @@ export const addVenue = async (req: Request, res: Response) => {
     }
 }
 
+export const getVenueById = async (req: Request, res: Response) => {
+    const venueId = parseInt(req.params.id);
+    try{
+        const venue = await prisma.venue.findUnique({
+            where: {id:venueId},
+            include: {tenant:true}
+            
+        })
 
+        if (!venue){
+            return res.status(404).json({error: "venue not found"});
+        }
+        res.status(200).json({data:venue, message: "Venue fetched successfully"});
+
+    }catch(error){
+        console.error('Failed to fetch venue:', error);
+        res.status(500).json({ error: 'Internal server error' });
+
+    }
+}
