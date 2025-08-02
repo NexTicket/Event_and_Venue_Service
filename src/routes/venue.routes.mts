@@ -1,5 +1,5 @@
 import  express  from "express";
-import { getAllVenues } from "../controllers/venue.controller.mjs";
+import { addVenue, getAllVenues } from "../controllers/venue.controller.mjs";
 
 const router = express.Router();
 
@@ -8,6 +8,8 @@ router.get('/venues', async (req, res) => {
     return getAllVenues(req,res);
 
 });
+
+router.post('/venues/addvenue', addVenue);
 
 export default router;
 
