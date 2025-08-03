@@ -1,35 +1,32 @@
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient } from '../generated/prisma';
 
 const prisma = new PrismaClient();
 
 async function main() {
-  const existingTenant = await prisma.tenant.findFirst({
-    where: { name: "Dummy Organizer" }
+  const existingEvent = await prisma.events.findFirst({
+    where: { name: "Sample Concert" }
   });
 
-  if (!existingTenant) {
-    const tenant = await prisma.tenant.create({
-      data: {
-        name: "Dummy Organizer"
-      }
-    });
-
-    await prisma.venue.createMany({
+  if (!existingEvent) {
+    await prisma.events.createMany({
       data: [
         {
-          name: "Savoy Cinema - Hall A",
-          seatMap: { rows: 6, cols: 10 },
-          tenantId: tenant.id
+          name: "Sample Concert",
+          description: "A sample concert event for testing",
+          date: new Date("2024-12-31T20:00:00Z"),
+          type: "Concert"
         },
         {
-          name: "Savoy Cinema - Hall B",
-          seatMap: { rows: 8, cols: 12 },
-          tenantId: tenant.id
+          name: "Tech Conference 2024",
+          description: "Annual technology conference",
+          date: new Date("2024-11-15T09:00:00Z"),
+          type: "Conference"
         },
         {
-          name: "Colombo City Center Hall",
-          seatMap: { rows: 5, cols: 15 },
-          tenantId: tenant.id
+          name: "Art Exhibition",
+          description: "Modern art exhibition",
+          date: new Date("2024-10-20T10:00:00Z"),
+          type: "Exhibition"
         }
       ]
     });
