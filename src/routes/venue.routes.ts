@@ -1,6 +1,14 @@
-import  express  from "express";
-import { addVenue, deleteVenue, getAllVenues, getSeatMap, getVenueById, updateSeatMap, updateVenue } from "../controllers/venue.controller";
-import { verifyToken } from "../middlewares/verifyToken";
+import express from "express";
+import { 
+  addVenue, 
+  deleteVenue, 
+  getAllVenues, 
+  getSeatMap, 
+  getVenueById, 
+  updateSeatMap, 
+  updateVenue 
+} from "../controllers/venue.controller.js";
+import { verifyToken } from "../middlewares/verifyToken.js";
 
 const router = express.Router();
 

@@ -1,4 +1,4 @@
-import { PrismaClient } from "@prisma/client";
+import { PrismaClient } from "../../generated/prisma/index.js";
 import {Request, Response} from 'express';
 
 // Extend the Express Request interface
@@ -24,7 +24,7 @@ function getPrisma() {
 export const getAllVenues = async (req: Request, res: Response) => {
     try{
         const venues = await(getPrisma().venue.findMany({
-            include: {tenant: true}
+            include: {Tenant: true}
         }));
         res.status(200).json({
             data : venues,
@@ -97,7 +97,7 @@ export const getVenueById = async (req: Request, res: Response) => {
   try {
     const venue = await getPrisma().venue.findUnique({
       where: { id: venueId },
-      include: { tenant: true },
+      include: { Tenant: true },
     });
 
     if (!venue) {
@@ -109,7 +109,7 @@ export const getVenueById = async (req: Request, res: Response) => {
       role === 'event_admin' ||
       role === 'organizer' ||
       role === 'customer' ||
-      (role === 'venue_owner' && venue.tenant?.firebaseUid === uid)
+      (role === 'venue_owner' && venue.Tenant?.firebaseUid === uid)
     ) {
       return res.status(200).json({
         data: venue,
@@ -133,7 +133,7 @@ export const updateVenue = async (req: Request, res: Response) => {
   try {
     const existing = await getPrisma().venue.findUnique({
       where: { id: venueId },
-      include: { tenant: true },
+      include: { Tenant: true },
     });
 
     if (!existing) {
@@ -142,7 +142,7 @@ export const updateVenue = async (req: Request, res: Response) => {
 
     if (
       role === 'venue_owner' && 
-      existing.tenant?.firebaseUid !== uid
+      existing.Tenant?.firebaseUid !== uid
     ) {
       return res.status(403).json({ error: "Not authorized to update this venue" });
     }
@@ -170,7 +170,7 @@ export const deleteVenue = async (req: Request, res: Response) => {
   try {
     const existing = await getPrisma().venue.findUnique({
       where: { id: venueId },
-      include: { tenant: true },
+      include: { Tenant: true },
     });
 
     if (!existing) {
@@ -179,7 +179,7 @@ export const deleteVenue = async (req: Request, res: Response) => {
 
     if (
       role === 'venue_owner' && 
-      existing.tenant?.firebaseUid !== uid
+      existing.Tenant?.firebaseUid !== uid
     ) {
       return res.status(403).json({ error: "Not authorized to delete this venue" });
     }

@@ -15,6 +15,7 @@ model Tenant {
   createdAt   DateTime @default(now())
   firebaseUid String?  @unique
   Venue       Venue[]
+  events      events[]
 }
 
 model Venue {
@@ -24,6 +25,7 @@ model Venue {
   tenantId Int
   capacity Int?
   location String?
+  image    String?
   Tenant   Tenant  @relation(fields: [tenantId], references: [id])
 }
 
@@ -37,4 +39,6 @@ model events {
   startDate   DateTime
   endDate     DateTime?
   created_at  DateTime? @db.Timestamptz(6)
+  
+  Tenant      Tenant    @relation(fields: [tenantId], references: [id])
 }

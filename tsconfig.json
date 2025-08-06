@@ -25,9 +25,12 @@
   "include": [
     "prisma/**/*.ts",
     "src/**/*.ts",
+    "src/**/*.d.ts",
     "*.ts",
-    "src"
-, "prisma/seed.mts", "jest.config.mjs"  ],
+    "src",
+    "prisma/seed.mts", 
+    "jest.config.mjs"
+  ],
   "exclude": [
     "node_modules",
     "dist"
