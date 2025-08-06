@@ -4,6 +4,7 @@ import helmet from 'helmet';
 import morgan from 'morgan';
 import dotenv from 'dotenv';
 import venueRoutes from './routes/venue.routes.js';
+import eventRoutes from './routes/events.routes.js';
 
 dotenv.config();
 
@@ -16,6 +17,7 @@ app.use(express.json());
 // Route placeholders (we’ll add them next)
 app.get('/', (_req, res) => res.send('API Running 🚀'));
 app.use('/api', venueRoutes);
+app.use('/api', eventRoutes);
 
 
 const PORT = process.env.PORT || 4000;
@@ -27,3 +29,4 @@ if (process.env.NODE_ENV !== 'test') {
     console.log(`🚀 Server on port ${PORT}`);
   });
 }
+

@@ -15,22 +15,26 @@ model Tenant {
   createdAt   DateTime @default(now())
   firebaseUid String?  @unique
   Venue       Venue[]
-  events      events[]
+  Event       events[]
 }
 
 model Venue {
-  id       Int     @id @default(autoincrement())
-  name     String
-  seatMap  Json
-  tenantId Int
-  capacity Int?
-  location String?
-  image    String?
-  Tenant   Tenant  @relation(fields: [tenantId], references: [id])
+  id            Int      @id @default(autoincrement())
+  name          String
+  seatMap       Json
+  tenantId      Int
+  capacity      Int?
+  location      String?
+  image         String?
+  ownerUid      String?
+  description   String?
+  featuredImage String?
+  images        String[]
+  Tenant        Tenant   @relation(fields: [tenantId], references: [id])
 }
 
 model events {
-  id          BigInt    @id @default(autoincrement())
+  id          Int    @id @default(autoincrement())
   tenantId    Int
   title       String
   description String
@@ -39,6 +43,5 @@ model events {
   startDate   DateTime
   endDate     DateTime?
   created_at  DateTime? @db.Timestamptz(6)
-  
   Tenant      Tenant    @relation(fields: [tenantId], references: [id])
 }
