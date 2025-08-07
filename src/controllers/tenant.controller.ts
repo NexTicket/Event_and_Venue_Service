@@ -1,4 +1,4 @@
-import { PrismaClient } from "@prisma/client";
+import { PrismaClient } from "../../generated/prisma";
 import { Request, Response } from 'express';
 
 // Lazy-load Prisma client

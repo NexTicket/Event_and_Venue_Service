@@ -1,5 +1,6 @@
 import { PrismaClient } from "../../generated/prisma";
 import { Request,Response } from 'express';
+import cloudinary from '../utils/cloudinary';
 
 // Extend the Express Request interface - this allows us to attach user data to the request object
 declare global {
@@ -271,3 +272,81 @@ export const deleteEvent = async ( req: Request , res: Response ) => {
         return res.status(500).json({error:'Internal server error'});
     }
 }
+
+// Upload event image to Cloudinary
+export const uploadEventImage = async (req: Request, res: Response) => {
+    console.log('🖼️ Event image upload request received');
+    console.log('🖼️ Files:', req.files);
+    console.log('🖼️ File:', req.file);
+    console.log('🖼️ Body:', req.body);
+
+    try {
+        const { eventId } = req.params;
+        const user = req.user;
+
+        console.log('🖼️ Event ID:', eventId);
+        console.log('🖼️ User:', user);
+
+        if (!eventId) {
+            return res.status(400).json({ error: 'Event ID is required' });
+        }
+
+        if (!req.file) {
+            console.log('❌ No file received in upload request');
+            return res.status(400).json({ 
+                error: 'No image file provided',
+                received: {
+                    file: !!req.file,
+                    files: !!req.files,
+                    fileKeys: req.files ? Object.keys(req.files) : []
+                }
+            });
+        }
+
+        // Check if event exists and user has permission
+        const event = await getPrisma().events.findUnique({
+            where: { id: parseInt(eventId) },
+            include: { Tenant: true }
+        });
+
+        if (!event) {
+            return res.status(404).json({ error: 'Event not found' });
+        }
+
+        // Check authorization
+        if (user.role !== 'admin' && event.Tenant?.firebaseUid !== user.uid) {
+            return res.status(403).json({ error: 'Not authorized to upload image for this event' });
+        }
+
+        console.log('🖼️ File uploaded to Cloudinary:', req.file);
+        
+        // Get the uploaded file URL from Cloudinary
+        const imageUrl = (req.file as any).path;
+        
+        console.log('🖼️ Image URL from Cloudinary:', imageUrl);
+
+        // Update the event with the image URL
+        const updatedEvent = await getPrisma().events.update({
+            where: { id: parseInt(eventId) },
+            data: { image: imageUrl }
+        });
+
+        console.log('✅ Event image updated successfully:', updatedEvent.id);
+
+        res.status(200).json({
+            message: 'Event image uploaded successfully',
+            data: {
+                eventId: updatedEvent.id,
+                imageUrl: imageUrl,
+                event: updatedEvent
+            }
+        });
+
+    } catch (error) {
+        console.error('❌ Error uploading event image:', error);
+        res.status(500).json({ 
+            error: 'Failed to upload image',
+            details: error instanceof Error ? error.message : 'Unknown error'
+        });
+    }
+};

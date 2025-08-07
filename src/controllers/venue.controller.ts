@@ -1,6 +1,6 @@
-import { PrismaClient } from "@prisma/client";
+import { PrismaClient } from "../../generated/prisma";
 import {Request, Response} from 'express';
-import { setUserRole } from "../utils/userRoles.js";
+import { setUserRole } from "../utils/userRoles";
 
 
 // Extend the Express Request interface
@@ -148,11 +148,10 @@ export const updateVenue = async (req: Request, res: Response) => {
       return res.status(404).json({ error: "Venue not found" });
     }
 
-    if (
-      role === 'venue_owner' && 
+    if (role === 'venue_owner' && 
       existing.tenant?.firebaseUid !== uid
     ) {
-      return res.status(403).json({ error: "Not authorized to update this venue" });
+      return res.status(403).json({ error: "You are not authorized to update this venue" });
     }
 
     const updated = await getPrisma().venue.update({
