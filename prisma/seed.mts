@@ -1,4 +1,4 @@
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient } from '../generated/prisma';
 
 const prisma = new PrismaClient({
   log: ['query', 'info', 'warn', 'error'],
@@ -324,6 +324,53 @@ async function main() {
     
     for (const tenant of finalTenants) {
       console.log(`  • ${tenant.name}: ${tenant.venues.length} venues`);
+    }
+
+    // Add sample events if none exist
+    console.log('\n🎭 Adding sample events...');
+    const existingEvents = await prisma.events.findMany();
+    
+    if (existingEvents.length === 0 && finalTenants.length > 0) {
+      const sampleEvents = [
+        {
+          tenantId: finalTenants[0].id,
+          title: "Sample Concert",
+          description: "A sample concert event for testing",
+          category: "MUSIC",
+          type: "EVENT" as const,
+          startDate: new Date("2024-12-31T20:00:00Z"),
+          endDate: new Date("2024-12-31T23:00:00Z"),
+          created_at: new Date()
+        },
+        {
+          tenantId: finalTenants[0].id,
+          title: "Tech Conference 2024",
+          description: "Annual technology conference",
+          category: "CONFERENCE",
+          type: "EVENT" as const,
+          startDate: new Date("2024-11-15T09:00:00Z"),
+          endDate: new Date("2024-11-15T17:00:00Z"),
+          created_at: new Date()
+        },
+        {
+          tenantId: finalTenants[0].id,
+          title: "Movie Night: Avengers",
+          description: "Special screening of Avengers movie",
+          category: "ENTERTAINMENT",
+          type: "MOVIE" as const,
+          startDate: new Date("2024-10-20T19:00:00Z"),
+          endDate: new Date("2024-10-20T22:00:00Z"),
+          created_at: new Date()
+        }
+      ];
+
+      await prisma.events.createMany({
+        data: sampleEvents
+      });
+      
+      console.log(`✅ Added ${sampleEvents.length} sample events`);
+    } else {
+      console.log(`⏭️  ${existingEvents.length} events already exist`);
     }
 
   } catch (error) {
