@@ -63,15 +63,11 @@ export const getAllEvents = async (req: Request , res: Response) => {
 };
 
 export const addEvent = async (req: Request, res: Response) => {
-    console.log('=== ADD EVENT REQUEST ===');
-    console.log('Request body:', JSON.stringify(req.body, null, 2));
-    console.log('Request headers:', req.headers);
-    console.log('User object:', req.user);
 
     const user = req.user;
     
     // For development: Allow admin and customer roles in addition to organizer
-    console.log('User role check:', user?.role);
+
     if (!user || !['organizer', 'admin', 'customer'].includes(user.role)) {
         console.log('❌ Authorization failed - invalid role:', user?.role);
         return res.status(403).json({
@@ -83,7 +79,6 @@ export const addEvent = async (req: Request, res: Response) => {
     
     const { title, description, category, type, startDate, endDate, venueId, image } = req.body;
     
-    console.log('Extracted fields:', { title, description, category, type, startDate, endDate, venueId, image });
     
     if(!title || !description || !category || !type || !startDate) {
         console.log('❌ Missing required fields');
@@ -91,6 +86,16 @@ export const addEvent = async (req: Request, res: Response) => {
             error: 'Missing required fields',
             required: ['title', 'description', 'category', 'type', 'startDate'],
             received: { title: !!title, description: !!description, category: !!category, type: !!type, startDate: !!startDate }
+        });
+    }
+
+    // Convert venueId to number if provided
+    const parsedVenueId = venueId ? parseInt(venueId, 10) : null;
+    if (venueId && (parsedVenueId === null || isNaN(parsedVenueId))) {
+        console.log('❌ Invalid venueId format:', venueId);
+        return res.status(400).json({ 
+            error: 'Invalid venueId - must be a number',
+            received: venueId
         });
     }
 
@@ -105,35 +110,31 @@ export const addEvent = async (req: Request, res: Response) => {
     }
 
     try {
-        console.log('Looking for tenant with Firebase UID:', user.uid);
         let tenant = await getPrisma().tenant.findUnique({
             where: { firebaseUid: user.uid }
         });
     
         if(!tenant){
-            console.log('Tenant not found, creating new tenant...');
             tenant = await getPrisma().tenant.create({
                 data: {
                     firebaseUid: user.uid,
-                    name: user.name || 'Unnamed Organizer'
+                    name: user.name || user.email || 'Unnamed Organizer'
                 }
             });
-            console.log('✅ New tenant created:', tenant);
-        } else {
-            console.log('✅ Existing tenant found:', tenant);
-        }
+        } 
+        
+        // Parse dates properly - handle both date-only and full datetime strings
+        const parseEventDate = (dateString: string) => {
+            // If it's a date-only format (YYYY-MM-DD), append time
+            if (/^\d{4}-\d{2}-\d{2}$/.test(dateString)) {
+                return new Date(`${dateString}T00:00:00Z`);
+            }
+            return new Date(dateString);
+        };
 
-        console.log('Creating event with data:', {
-            title,
-            description,
-            category,
-            type,
-            startDate: new Date(startDate),
-            endDate: endDate ? new Date(endDate) : null,
-            tenantId: tenant.id,
-            venueId: venueId || null,
-            image: image || null
-        });
+        const eventStartDate = parseEventDate(startDate);
+        const eventEndDate = endDate ? parseEventDate(endDate) : null;
+
 
         const newEvent = await getPrisma().events.create({
             data: {
@@ -141,15 +142,13 @@ export const addEvent = async (req: Request, res: Response) => {
                 description,
                 category,
                 type,
-                startDate: new Date(startDate),
-                endDate: endDate ? new Date(endDate) : null,
+                startDate: eventStartDate,
+                endDate: eventEndDate,
                 tenantId: tenant.id,
-                venueId: venueId || null,
+                venueId: parsedVenueId,
                 image: image || null
             }
         });
-
-        console.log('✅ Event created successfully:', newEvent);
 
         res.status(201).json({
             data: newEvent,
@@ -330,8 +329,6 @@ export const uploadEventImage = async (req: Request, res: Response) => {
             where: { id: parseInt(eventId) },
             data: { image: imageUrl }
         });
-
-        console.log('✅ Event image updated successfully:', updatedEvent.id);
 
         res.status(200).json({
             message: 'Event image uploaded successfully',
