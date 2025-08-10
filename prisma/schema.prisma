@@ -19,40 +19,36 @@ model Tenant {
 }
 
 model Venue {
-  id       Int     @id @default(autoincrement())
-  name     String
-  seatMap  Json
-  tenantId Int
-  capacity Int?
-  location String?
-  image    String?
-  tenant   Tenant  @relation(fields: [tenantId], references: [id])
-  ownerUid String? @unique
-  events   events[] // One venue can host multiple events
+  id            Int      @id @default(autoincrement())
+  name          String
+  seatMap       Json
+  tenantId      Int
+  capacity      Int?
+  location      String?
+  image         String?
+  ownerUid      String?
+  description   String?
+  featuredImage String?
+  images        String[]
+  tenant        Tenant   @relation(fields: [tenantId], references: [id])
+  events        events[]
 }
 
 model events {
-  id          Int       @id @default(autoincrement())
+  id          Int         @id @default(autoincrement())
   tenantId    Int
   title       String
   description String
   category    String
-  type        EventType
+  type        String
   startDate   DateTime
   endDate     DateTime?
-  created_at  DateTime? @db.Timestamptz(6)
-
+  created_at  DateTime?   @db.Timestamptz(6)
   status      EventStatus @default(PENDING)
-  venueId     Int?        
-  image       String?     
-
-  Tenant      Tenant    @relation(fields: [tenantId], references: [id])
-  venue       Venue?    @relation(fields: [venueId], references: [id])
-}
-
-enum EventType {
-  MOVIE
-  EVENT
+  venueId     Int?
+  image       String?
+  Tenant      Tenant      @relation(fields: [tenantId], references: [id])
+  venue       Venue?      @relation(fields: [venueId], references: [id])
 }
 
 enum EventStatus {
