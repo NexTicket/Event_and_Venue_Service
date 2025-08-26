@@ -72,6 +72,7 @@ export const verifyToken = async (req: Request, res: Response, next: NextFunctio
       uid: decodedToken.uid,
       role: userRole,
       email: decodedToken.email,
+      name: decodedToken.name || decodedToken.display_name || null,
     };
     console.log('🔍 Decoded Token custom claims:', { role: decodedToken.role, uid: decodedToken.uid });
     console.log('� Full decoded token for debugging:', {

@@ -7,6 +7,7 @@ import dotenv from 'dotenv';
 import venueRoutes  from './routes/venue.routes';
 import tenantRoutes from './routes/tenant.routes';
 import userRoutes   from './routes/user.routes';
+import eventRoutes  from './routes/events.routes';
 
 dotenv.config();
 
@@ -45,6 +46,7 @@ app.get('/', (_req, res) => res.send('EVMS API Running 🚀'));
 app.use('/api', venueRoutes);   // includes /venues/:id/image
 app.use('/api', tenantRoutes);
 app.use('/api', userRoutes);
+app.use('/api', eventRoutes);
 
 /* ───────────── server ───────────── */
 const PORT = process.env.PORT || 4000;
