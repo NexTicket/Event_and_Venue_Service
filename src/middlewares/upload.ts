@@ -20,11 +20,25 @@ const storage = new CloudinaryStorage({
   cloudinary,
   params: async (req, file) => {
     console.log(`☁️ Cloudinary storage params for file: ${file.originalname}`);
+    console.log(`☁️ Request URL: ${req.url}`);
+    
     try {
+      // Determine folder based on the endpoint
+      let folder = 'nex-ticket/general';
+      let publicIdPrefix = 'file';
+      
+      if (req.url.includes('/venues/')) {
+        folder = 'nex-ticket/venues';
+        publicIdPrefix = 'venue';
+      } else if (req.url.includes('/events/')) {
+        folder = 'nex-ticket/events';
+        publicIdPrefix = 'event';
+      }
+      
       const params = {
-        folder: 'nex-ticket/venues',
+        folder: folder,
         allowed_formats: ['jpg', 'png', 'jpeg'],
-        public_id: `venue-${Date.now()}-${file.originalname.split('.')[0]}`,
+        public_id: `${publicIdPrefix}-${Date.now()}-${file.originalname.split('.')[0]}`,
       };
       console.log(`☁️ Cloudinary upload params:`, params);
       return params;
