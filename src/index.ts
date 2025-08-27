@@ -6,7 +6,7 @@ import dotenv from 'dotenv';
 
 import venueRoutes  from './routes/venue.routes';
 import tenantRoutes from './routes/tenant.routes';
-import userRoutes   from './routes/user.routes';
+import { userRoutes }   from './routes/user.routes';
 import eventRoutes  from './routes/events.routes';
 
 dotenv.config();

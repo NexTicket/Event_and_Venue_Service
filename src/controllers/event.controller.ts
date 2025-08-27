@@ -1,4 +1,4 @@
-import { PrismaClient } from "../../generated/prisma";
+import { PrismaClient } from "../../generated/prisma/index.js";
 import { Request,Response } from 'express';
 import cloudinary from '../utils/cloudinary';
 
@@ -31,6 +31,8 @@ export const getAllEvents = async (req: Request , res: Response) => {
                 description: true,
                 startDate: true,
                 endDate: true,
+                startTime: true,
+                endTime: true,
                 category: true,
                 type: true,
                 status: true,
@@ -77,7 +79,7 @@ export const addEvent = async (req: Request, res: Response) => {
         });
     }
     
-    const { title, description, category, type, startDate, endDate, venueId, image } = req.body;
+    const { title, description, category, type, startDate, endDate, startTime, endTime, venueId, image } = req.body;
     
     
     if(!title || !description || !category || !type || !startDate) {
@@ -144,6 +146,8 @@ export const addEvent = async (req: Request, res: Response) => {
                 type,
                 startDate: eventStartDate,
                 endDate: eventEndDate,
+                startTime: startTime ?? null,
+                endTime: endTime ?? null,
                 tenantId: tenant.id,
                 venueId: parsedVenueId,
                 image: image || null
