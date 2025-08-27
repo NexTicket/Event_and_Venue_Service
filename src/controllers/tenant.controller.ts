@@ -1,4 +1,4 @@
-import { PrismaClient } from "../../generated/prisma";
+import { PrismaClient } from "../../generated/prisma/index.js";
 import { Request, Response } from 'express';
 
 // Lazy-load Prisma client

@@ -10,4 +10,5 @@ router.post('/users/bootstrap-admin', bootstrapAdmin);
 // Set custom claims for a user (admin only)
 router.post('/users/set-claims', verifyToken, setUserClaims);
 
-export default router;
+// Fix: Use named export instead of default export for ESM compatibility
+export const userRoutes = router;

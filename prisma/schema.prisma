@@ -39,10 +39,12 @@ model events {
   tenantId    Int
   title       String
   description String
-  category    String
+  category    String // Keep as String for now to preserve existing data
   type        String
   startDate   DateTime
   endDate     DateTime?
+  startTime   String?
+  endTime     String?
   created_at  DateTime?   @db.Timestamptz(6)
   status      EventStatus @default(PENDING)
   venueId     Int?
@@ -57,4 +59,15 @@ enum EventStatus {
   REJECTED
   CANCELLED
   COMPLETED
+}
+
+enum Category {
+  MUSIC
+  SPORTS
+  THEATER
+  COMEDY
+  CONFERENCE
+  FESTIVAL
+  WORKSHOP
+  OTHER
 }
