@@ -1,18 +1,19 @@
 import  express  from "express";
 import { addVenue, deleteVenue, getAllVenues, getSeatMap, getVenueById, updateSeatMap, updateVenue, uploadVenueImage, getMyVenues, setRole } from "../controllers/venue.controller";
 import { verifyToken } from "../middlewares/verifyToken";
+import { optionalAuth } from "../middlewares/optionalAuth";
 import upload from "../middlewares/upload";
 
 const router = express.Router();
 
-router.get('/venues', async (req, res) => {
+// Public endpoint that works with or without authentication
+router.get('/venues', optionalAuth, async (req, res) => {
     res.status(200);
     return getAllVenues(req,res);
-
 });
 
 router.post('/venues', verifyToken, addVenue);
-router.get('/venues/getvenuebyid/:id', verifyToken, getVenueById);
+router.get('/venues/getvenuebyid/:id', optionalAuth, getVenueById);
 router.put('/venues/updatevenue/:id', verifyToken, updateVenue);
 router.delete('/venues/deletevenue/:id', verifyToken, deleteVenue);
 router.get('/:id/seats', verifyToken, getSeatMap);
