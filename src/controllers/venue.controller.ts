@@ -24,19 +24,25 @@ function getPrisma() {
 
 
 export const getAllVenues = async (req: Request, res: Response) => {
-    try{
+    try {
+        // This endpoint works for both authenticated and unauthenticated users
+        const user = req.user; // Will be undefined if not authenticated
+        console.log('👤 GetAllVenues - User:', user ? `${user.email} (${user.role})` : 'Public request');
+        
         const venues = await(getPrisma().venue.findMany({
             include: {tenant: true}
         }));
+        
+        console.log(`📍 Found ${venues.length} venues`);
+        
         res.status(200).json({
             data : venues,
             message : "Venues fetched successfully",
         })
 
-    }catch(error){
+    } catch(error) {
         console.error('Failed to fetch venues:', error);
         res.status(500).json({ error: 'Internal server error' });
-
     }
 }
 
@@ -99,8 +105,11 @@ export const addVenue = async (req: Request, res: Response) => {
 
 
 export const getVenueById = async (req: Request, res: Response) => {
-  const { role, uid } = req.user;
+  const user = req.user; // May be undefined for public requests
   const venueId = parseInt(req.params.id);
+
+  console.log('👤 GetVenueById - User:', user ? `${user.email} (${user.role})` : 'Public request');
+  console.log('📍 Requested venue ID:', venueId);
 
   try {
     const venue = await getPrisma().venue.findUnique({
@@ -112,6 +121,18 @@ export const getVenueById = async (req: Request, res: Response) => {
       return res.status(404).json({ error: "Venue not found" });
     }
 
+    // If no user (public request), return basic venue info
+    if (!user) {
+      console.log('🌐 Public access - returning basic venue info');
+      return res.status(200).json({
+        data: venue,
+        message: "Venue fetched successfully",
+      });
+    }
+
+    // If authenticated user, apply role-based access control
+    const { role, uid } = user;
+    
     if (
       role === 'admin' ||
       role === 'event_admin' ||
@@ -119,11 +140,13 @@ export const getVenueById = async (req: Request, res: Response) => {
       role === 'customer' ||
       (role === 'venue_owner' && venue.tenant?.firebaseUid === uid)
     ) {
+      console.log('✅ Authenticated access granted');
       return res.status(200).json({
         data: venue,
         message: "Venue fetched successfully",
       });
     } else {
+      console.log('❌ Authenticated but not authorized');
       return res.status(403).json({ error: "Not authorized to view this venue" });
     }
   } catch (error) {

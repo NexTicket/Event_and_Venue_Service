@@ -38,3 +38,5 @@ model events {
   endDate     DateTime?
   created_at  DateTime? @db.Timestamptz(6)
 }
+
+
