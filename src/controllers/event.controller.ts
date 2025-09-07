@@ -269,7 +269,7 @@ export const deleteEvent = async ( req: Request , res: Response ) => {
             where : { id : eventId}
         })
 
-        res.status(200).json({error:'Event deleted successfully'})
+        res.status(200).json({message:'Event deleted successfully'})
     }catch(error){
         console.error('Failed to delete event',error);
         return res.status(500).json({error:'Internal server error'});
