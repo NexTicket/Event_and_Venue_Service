@@ -35,7 +35,8 @@ export const verifyToken = async (req: Request, res: Response, next: NextFunctio
       'admin@nexticket.com', 
       'admin@company.com',
       'admin@test.com',
-      'test@admin.com'
+      'test@admin.com',
+      'hello@Hi.com'
     ];
     
     // Check admin email or development mode
