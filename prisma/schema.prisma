@@ -39,16 +39,16 @@ model events {
   tenantId    Int
   title       String
   description String
-  category    String // Keep as String for now to preserve existing data
+  category    String
   type        String
   startDate   DateTime
   endDate     DateTime?
-  startTime   String?
-  endTime     String?
   created_at  DateTime?   @db.Timestamptz(6)
   status      EventStatus @default(PENDING)
   venueId     Int?
   image       String?
+  endTime     String?
+  startTime   String?
   Tenant      Tenant      @relation(fields: [tenantId], references: [id])
   venue       Venue?      @relation(fields: [venueId], references: [id])
 }
@@ -71,5 +71,3 @@ enum Category {
   WORKSHOP
   OTHER
 }
-
-

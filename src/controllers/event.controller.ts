@@ -2,6 +2,7 @@ import { PrismaClient } from "../../generated/prisma/index.js";
 import { Request,Response } from 'express';
 import cloudinary from '../utils/cloudinary';
 
+
 // Extend the Express Request interface - this allows us to attach user data to the request object
 declare global {
     namespace Express {
@@ -24,6 +25,9 @@ function getPrisma() {
 export const getAllEvents = async (req: Request , res: Response) => {
     try {
         const events = await getPrisma().events.findMany({
+            where: {
+                status: 'APPROVED' // Only show approved events for public access
+            },
             select: {
                 // select all event fields
                 id: true,
@@ -52,6 +56,9 @@ export const getAllEvents = async (req: Request , res: Response) => {
                     }
                 }
                 
+            },
+            orderBy: {
+                startDate: 'asc'
             }
         });
         res.status(200).json({
@@ -60,6 +67,67 @@ export const getAllEvents = async (req: Request , res: Response) => {
         });
     } catch (error) {
         console.error('Failed to fetch events:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+};
+
+export const getEventsByVenueId = async (req: Request, res: Response) => {
+    try {
+        const venueId = parseInt(req.params.venueId);
+        
+        if (!venueId || isNaN(venueId)) {
+            return res.status(400).json({ 
+                error: 'Invalid venue ID provided',
+                received: req.params.venueId
+            });
+        }
+
+        // Fetch events for the specific venue
+        const events = await getPrisma().events.findMany({
+            where: { 
+                venueId: venueId,
+                status: 'APPROVED' // Only show approved events to public
+            },
+            select: {
+                id: true,
+                title: true,
+                description: true,
+                startDate: true,
+                endDate: true,
+                startTime: true,
+                endTime: true,
+                category: true,
+                type: true,
+                status: true,
+                image: true,
+                venueId: true,
+                Tenant: {
+                    select: {
+                        id: true,
+                        name: true
+                    }
+                },
+                venue: {
+                    select: {
+                        id: true,
+                        name: true,
+                        location: true,
+                        capacity: true
+                    }
+                }
+            },
+            orderBy: {
+                startDate: 'asc' // Order by event start date
+            }
+        });
+
+        res.status(200).json({
+            data: events,
+            message: `Events for venue ${venueId} fetched successfully`,
+            count: events.length
+        });
+    } catch (error) {
+        console.error('Failed to fetch events by venue ID:', error);
         res.status(500).json({ error: 'Internal server error' });
     }
 };
@@ -169,8 +237,11 @@ export const addEvent = async (req: Request, res: Response) => {
 };
 
 export const getEventById = async (req: Request, res: Response) => {
-    const { role, uid } = req.user;
     const eventId = parseInt(req.params.id);
+    
+    // For public access, user might not exist
+    const user = req.user;
+    const { role, uid } = user || {};
 
     try {
         const event = await getPrisma().events.findUnique({
@@ -198,6 +269,20 @@ export const getEventById = async (req: Request, res: Response) => {
             return res.status(404).json({ error: 'Event not found' });
         }
 
+        // For public access, only show approved events
+        // For authenticated users, apply the original logic
+        if (!user) {
+            // Public access - only show approved events
+            if (event.status !== 'APPROVED') {
+                return res.status(404).json({ error: 'Event not found' });
+            }
+            return res.status(200).json({
+                data: event,
+                message: 'Event fetched successfully'
+            });
+        }
+
+        // Authenticated access - apply original authorization logic
         if(role === 'admin'|| role === 'customer' || role === 'venue_owner'|| (role === 'event_admin'|| role === 'organizer') && event.Tenant?.firebaseUid === uid) {
             return res.status(200).json({
                 data: event,
@@ -351,3 +436,111 @@ export const uploadEventImage = async (req: Request, res: Response) => {
         });
     }
 };
+
+
+// Approve event controller
+
+
+export const approveEvent = async (req: Request, res: Response) => {
+    const user = req.user;
+    const eventId = parseInt(req.params.eventId);
+    const venueId = parseInt(req.params.venueId);
+    if (!user || user.role !== 'admin') {
+        return res.status(403).json({ error: 'Only admins can approve events' });
+    }
+    try {
+        const event = await getPrisma().events.findUnique({ where: { id: eventId } });
+        if (!event) {
+            return res.status(404).json({ error: 'Event not found' });
+        }
+        const updatedEvent = await getPrisma().events.update({
+            where: { id: eventId },
+            data: { status: 'APPROVED', venueId:venueId }
+        });
+
+        res.status(200).json({
+            message: 'Event approved successfully',
+            data: updatedEvent
+        });
+    } catch (error) {
+        console.error('Failed to approve event:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+};
+
+// Get events by organizer (firebaseUid)
+export const getEventsByOrganizer = async (req: Request, res: Response) => {
+    try {
+        const { organizerId } = req.params;
+        
+        if (!organizerId) {
+            return res.status(400).json({ 
+                error: 'Organizer ID is required',
+                received: organizerId
+            });
+        }
+
+        // First find the tenant with this firebaseUid
+        const tenant = await getPrisma().tenant.findUnique({
+            where: { firebaseUid: organizerId }
+        });
+
+        if (!tenant) {
+            return res.status(404).json({ 
+                error: 'Organizer not found',
+                organizerId: organizerId
+            });
+        }
+
+        // Fetch events for this tenant/organizer
+        const events = await getPrisma().events.findMany({
+            where: { 
+                tenantId: tenant.id
+                // Note: Not filtering by status here so organizers can see all their events
+            },
+            select: {
+                id: true,
+                title: true,
+                description: true,
+                startDate: true,
+                endDate: true,
+                startTime: true,
+                endTime: true,
+                category: true,
+                type: true,
+                status: true,
+                image: true,
+                venueId: true,
+                Tenant: {
+                    select: {
+                        id: true,
+                        name: true,
+                        firebaseUid: true
+                    }
+                },
+                venue: {
+                    select: {
+                        id: true,
+                        name: true,
+                        location: true,
+                        capacity: true
+                    }
+                }
+            },
+            orderBy: {
+                startDate: 'asc'
+            }
+        });
+
+        res.status(200).json({
+            data: events,
+            message: `Events for organizer ${organizerId} fetched successfully`,
+            count: events.length,
+            organizerName: tenant.name
+        });
+    } catch (error) {
+        console.error('Failed to fetch events by organizer:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+};
+
