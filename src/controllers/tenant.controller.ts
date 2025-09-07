@@ -28,9 +28,9 @@ export const createTenant = async (req: Request, res: Response) => {
   }
 
   // Validate role
-  if (!['venue_owner', 'organizer'].includes(role)) {
+  if (!['venue_owner', 'organizer', 'event_admin', 'checkin_officer'].includes(role)) {
     return res.status(400).json({ 
-      error: 'Invalid role. Only venue_owner and organizer roles can create tenants' 
+      error: 'Invalid role. Only venue_owner, organizer, event_admin, and checkin_officer roles can create tenants' 
     });
   }
 

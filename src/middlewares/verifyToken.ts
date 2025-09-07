@@ -2,6 +2,7 @@
 
 import { NextFunction, Request, Response } from 'express';
 import { getAuth } from 'firebase-admin/auth';
+import { getFirestore } from 'firebase-admin/firestore';
 import { initializeApp, cert } from 'firebase-admin/app';
 import { config } from 'dotenv';
 config();
@@ -30,6 +31,10 @@ export const verifyToken = async (req: Request, res: Response, next: NextFunctio
     // 🔑 Check for custom claims first - they are directly accessible on decodedToken
     let userRole = decodedToken.role; // No await needed - custom claims are synchronously available
     
+    if (userRole) {
+      console.log(`✅ Found role in custom claims: ${userRole}`);
+    }
+    
     // TEMPORARY FIX: Check if user is admin by email until custom claims are properly set
     const adminEmails = [
       'admin@nexticket.com', 
@@ -39,22 +44,34 @@ export const verifyToken = async (req: Request, res: Response, next: NextFunctio
       'hello@Hi.com'
     ];
     
-    // Check admin email or development mode
-    const isAdminEmail = decodedToken.email && (
-      adminEmails.includes(decodedToken.email.toLowerCase()) ||
-      decodedToken.email.toLowerCase().includes('admin') ||
-      process.env.NODE_ENV === 'development'
-    );
+    // Only override to admin for specific admin emails - don't use development mode check
+    const isAdminEmail = decodedToken.email && adminEmails.includes(decodedToken.email.toLowerCase());
     
     if (!userRole && isAdminEmail) {
       userRole = 'admin';
       console.log(`⚡ TEMPORARY: Admin detected by email (${decodedToken.email}), overriding role to admin`);
     }
     
-    // If no custom claims role, we could fetch from database here
-    // For now, let's check the custom claims
+    // If no custom claims role, fetch from Firestore users collection
     if (!userRole) {
-      console.log('⚠️ No role in custom claims, using default. Set custom claims with Firebase Admin SDK.');
+      try {
+        const db = getFirestore();
+        const userDoc = await db.collection('users').doc(decodedToken.uid).get();
+        
+        if (userDoc.exists) {
+          const userData = userDoc.data();
+          userRole = userData?.role;
+          console.log(`✅ Found role in Firestore: ${userRole} for ${decodedToken.email}`);
+        } else {
+          console.log(`⚠️ No user document found in Firestore for ${decodedToken.email}`);
+        }
+      } catch (error) {
+        console.error('❌ Error fetching user role from Firestore:', error);
+      }
+    }
+    
+    if (!userRole) {
+      console.log('⚠️ No role found in custom claims or Firestore, using default customer role.');
       console.log('📋 Available custom claims on token:', {
         role: decodedToken.role,
         uid: decodedToken.uid,
@@ -64,8 +81,6 @@ export const verifyToken = async (req: Request, res: Response, next: NextFunctio
         customClaims: decodedToken
       });
       userRole = 'customer'; // fallback
-    } else {
-      console.log(`✅ Found role in custom claims: ${userRole}`);
     }
     
     // 🔑 Attach UID and role to req.user
