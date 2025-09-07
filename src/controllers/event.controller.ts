@@ -1,6 +1,7 @@
 import { PrismaClient } from "../../generated/prisma/index.js";
 import { Request,Response } from 'express';
 import cloudinary from '../utils/cloudinary';
+import { ensureTenantExists } from '../utils/autoCreateTenant.js';
 
 
 // Extend the Express Request interface - this allows us to attach user data to the request object
@@ -24,10 +25,21 @@ function getPrisma() {
 
 export const getAllEvents = async (req: Request , res: Response) => {
     try {
+        // Get status from query parameter, default to 'APPROVED' for public access
+        const status = req.query.status as string;
+        
+        // Build where clause based on status parameter
+        const whereClause: any = {};
+        if (status) {
+            whereClause.status = status.toUpperCase();
+        } else {
+            whereClause.status = 'APPROVED'; // Default to approved events for public access
+        }
+
+        console.log('🔍 getAllEvents called with status filter:', status || 'APPROVED (default)');
+
         const events = await getPrisma().events.findMany({
-            where: {
-                status: 'APPROVED' // Only show approved events for public access
-            },
+            where: whereClause,
             select: {
                 // select all event fields
                 id: true,
@@ -42,6 +54,8 @@ export const getAllEvents = async (req: Request , res: Response) => {
                 status: true,
                 image: true,
                 venueId: true,
+                eventAdminUid: true,
+                checkinOfficerUids: true,
                 Tenant:{
                     select: {
                         id: true, 
@@ -61,6 +75,8 @@ export const getAllEvents = async (req: Request , res: Response) => {
                 startDate: 'asc'
             }
         });
+
+        console.log(`📊 Found ${events.length} events with status: ${status || 'APPROVED'}`);
         res.status(200).json({
             data: events,
             message: "Events fetched successfully"
@@ -132,12 +148,163 @@ export const getEventsByVenueId = async (req: Request, res: Response) => {
     }
 };
 
+// Get events assigned to a specific event admin
+export const getEventsByEventAdmin = async (req: Request, res: Response) => {
+    try {
+        const user = req.user;
+        
+        if (!user || user.role !== 'event_admin') {
+            return res.status(403).json({ error: 'Only event admins can access this endpoint' });
+        }
+
+        console.log('🎯 Fetching events for event admin:', user.uid);
+
+        const events = await getPrisma().events.findMany({
+            where: {
+                eventAdminUid: user.uid,
+                status: 'APPROVED' // Only show approved events
+            },
+            select: {
+                id: true,
+                title: true,
+                description: true,
+                startDate: true,
+                endDate: true,
+                startTime: true,
+                endTime: true,
+                category: true,
+                type: true,
+                status: true,
+                image: true,
+                venueId: true,
+                eventAdminUid: true,
+                checkinOfficerUids: true,
+                Tenant: {
+                    select: {
+                        id: true,
+                        name: true
+                    }
+                },
+                venue: {
+                    select: {
+                        id: true,
+                        name: true,
+                        location: true,
+                        capacity: true
+                    }
+                }
+            },
+            orderBy: {
+                startDate: 'asc'
+            }
+        });
+
+        console.log(`📊 Found ${events.length} events assigned to event admin: ${user.uid}`);
+
+        // Transform the data to match frontend expectations (title -> name)
+        const transformedEvents = events.map(event => ({
+            ...event,
+            name: event.title, // Map title to name for frontend compatibility
+            capacity: event.venue?.capacity || 0
+        }));
+
+        res.status(200).json({
+            data: transformedEvents,
+            message: "Assigned events fetched successfully",
+            count: transformedEvents.length
+        });
+    } catch (error) {
+        console.error('❌ Failed to fetch events for event admin:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+};
+
+// Get events assigned to a specific checkin officer
+export const getEventsByCheckinOfficer = async (req: Request, res: Response) => {
+    try {
+        const user = req.user;
+        
+        if (!user || user.role !== 'checkin_officer') {
+            return res.status(403).json({ error: 'Only checkin officers can access this endpoint' });
+        }
+
+        console.log('🎯 Fetching events for checkin officer:', user.uid);
+
+        const events = await getPrisma().events.findMany({
+            where: {
+                checkinOfficerUids: {
+                    has: user.uid // Check if the user's UID is in the array
+                },
+                status: 'APPROVED' // Only show approved events
+            },
+            select: {
+                id: true,
+                title: true,
+                description: true,
+                startDate: true,
+                endDate: true,
+                startTime: true,
+                endTime: true,
+                category: true,
+                type: true,
+                status: true,
+                image: true,
+                venueId: true,
+                eventAdminUid: true,
+                checkinOfficerUids: true,
+                Tenant: {
+                    select: {
+                        id: true,
+                        name: true
+                    }
+                },
+                venue: {
+                    select: {
+                        id: true,
+                        name: true,
+                        location: true,
+                        capacity: true
+                    }
+                }
+            },
+            orderBy: {
+                startDate: 'asc'
+            }
+        });
+
+        console.log(`📊 Found ${events.length} events assigned to checkin officer: ${user.uid}`);
+
+        // Transform the data to match frontend expectations (title -> name)
+        const transformedEvents = events.map(event => ({
+            ...event,
+            name: event.title, // Map title to name for frontend compatibility
+            capacity: event.venue?.capacity || 0
+        }));
+
+        res.status(200).json({
+            data: transformedEvents,
+            message: "Assigned events fetched successfully",
+            count: transformedEvents.length
+        });
+    } catch (error) {
+        console.error('❌ Failed to fetch events for checkin officer:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+};
+
 export const addEvent = async (req: Request, res: Response) => {
 
     const user = req.user;
     
+    console.log('🎫 AddEvent - User details:', {
+        exists: !!user,
+        uid: user?.uid,
+        email: user?.email,
+        role: user?.role,
+        name: user?.name
+    });
+    
     // For development: Allow admin and customer roles in addition to organizer
-
     if (!user || !['organizer', 'admin', 'customer'].includes(user.role)) {
         console.log('❌ Authorization failed - invalid role:', user?.role);
         return res.status(403).json({
@@ -180,18 +347,19 @@ export const addEvent = async (req: Request, res: Response) => {
     }
 
     try {
-        let tenant = await getPrisma().tenant.findUnique({
-            where: { firebaseUid: user.uid }
-        });
-    
-        if(!tenant){
-            tenant = await getPrisma().tenant.create({
-                data: {
-                    firebaseUid: user.uid,
-                    name: user.name || user.email || 'Unnamed Organizer'
-                }
+        console.log('🏢 Ensuring tenant exists for user:', user.uid);
+        // Ensure user has a tenant record
+        const tenant = await ensureTenantExists(user);
+        
+        if (!tenant) {
+            console.log('❌ Failed to create/find tenant for user:', user.uid);
+            return res.status(400).json({
+                error: 'Unable to create tenant for user',
+                userRole: user.role
             });
-        } 
+        }
+        
+        console.log('✅ Tenant found/created:', tenant.id); 
         
         // Parse dates properly - handle both date-only and full datetime strings
         const parseEventDate = (dateString: string) => {
@@ -301,7 +469,16 @@ export const getEventById = async (req: Request, res: Response) => {
 export const updateEvent = async (req: Request, res: Response) => {
     const { uid , role} = req.user;
     const eventId = parseInt(req.params.id);
-    const { endDate } = req.body;
+    const { 
+        title, 
+        description, 
+        startDate, 
+        endDate, 
+        startTime, 
+        endTime, 
+        capacity, 
+        checkinOfficerUids 
+    } = req.body;
 
     try{
         const existing = await getPrisma().events.findUnique({
@@ -317,9 +494,32 @@ export const updateEvent = async (req: Request, res: Response) => {
             return res.status(403).json({error: 'You are not authorized to update this event'})
         }
 
+        // Build update data object, only including fields that are provided
+        const updateData: any = {};
+        if (title !== undefined) updateData.title = title;
+        if (description !== undefined) updateData.description = description;
+        if (startDate !== undefined) updateData.startDate = new Date(startDate);
+        if (endDate !== undefined) updateData.endDate = new Date(endDate);
+        if (startTime !== undefined) updateData.startTime = startTime;
+        if (endTime !== undefined) updateData.endTime = endTime;
+        if (capacity !== undefined) updateData.capacity = parseInt(capacity);
+        if (checkinOfficerUids !== undefined) {
+            // Clean and validate checkinOfficerUids
+            const cleanUids = Array.isArray(checkinOfficerUids) 
+                ? checkinOfficerUids.filter((uid: any) => uid && uid.trim()) 
+                : [];
+            updateData.checkinOfficerUids = cleanUids;
+        }
+
+        console.log('🔄 Updating event with data:', updateData);
+
         const updated = await getPrisma().events.update({
             where : { id: eventId },
-            data: { endDate },
+            data: updateData,
+            include: {
+                Tenant: true,
+                venue: true
+            }
         })
 
         res.status(200).json({
@@ -439,31 +639,84 @@ export const uploadEventImage = async (req: Request, res: Response) => {
 
 
 // Approve event controller
-
-
 export const approveEvent = async (req: Request, res: Response) => {
     const user = req.user;
     const eventId = parseInt(req.params.eventId);
-    const venueId = parseInt(req.params.venueId);
+    const { venueId, eventAdminUid, checkinOfficerUids } = req.body;
+    
+    console.log('🔍 Approve event request:', { eventId, venueId, eventAdminUid, checkinOfficerUids });
+    
     if (!user || user.role !== 'admin') {
         return res.status(403).json({ error: 'Only admins can approve events' });
     }
+    
     try {
         const event = await getPrisma().events.findUnique({ where: { id: eventId } });
         if (!event) {
             return res.status(404).json({ error: 'Event not found' });
         }
+        
+        // Clean and validate checkinOfficerUids - remove any null/undefined values
+        let cleanCheckinOfficerUids: string[] = [];
+        if (Array.isArray(checkinOfficerUids)) {
+            cleanCheckinOfficerUids = checkinOfficerUids.filter((uid: any) => uid !== null && uid !== undefined && uid !== '');
+        }
+        
+        console.log('✅ Cleaned checkinOfficerUids:', cleanCheckinOfficerUids);
+        
+        // Update event status and assign staff
         const updatedEvent = await getPrisma().events.update({
             where: { id: eventId },
-            data: { status: 'APPROVED', venueId:venueId }
+            data: { 
+                status: 'APPROVED', 
+                venueId: venueId ? parseInt(venueId) : null,
+                eventAdminUid: eventAdminUid || null,
+                checkinOfficerUids: cleanCheckinOfficerUids
+            },
+            include: {
+                venue: true,
+                Tenant: true
+            }
         });
+
+        console.log('✅ Event approved successfully:', updatedEvent.id);
 
         res.status(200).json({
             message: 'Event approved successfully',
             data: updatedEvent
         });
     } catch (error) {
-        console.error('Failed to approve event:', error);
+        console.error('❌ Failed to approve event:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+};
+
+// Reject event controller
+export const rejectEvent = async (req: Request, res: Response) => {
+    const user = req.user;
+    const eventId = parseInt(req.params.eventId);
+    
+    if (!user || user.role !== 'admin') {
+        return res.status(403).json({ error: 'Only admins can reject events' });
+    }
+    
+    try {
+        const event = await getPrisma().events.findUnique({ where: { id: eventId } });
+        if (!event) {
+            return res.status(404).json({ error: 'Event not found' });
+        }
+        
+        const updatedEvent = await getPrisma().events.update({
+            where: { id: eventId },
+            data: { status: 'REJECTED' }
+        });
+
+        res.status(200).json({
+            message: 'Event rejected successfully',
+            data: updatedEvent
+        });
+    } catch (error) {
+        console.error('Failed to reject event:', error);
         res.status(500).json({ error: 'Internal server error' });
     }
 };
