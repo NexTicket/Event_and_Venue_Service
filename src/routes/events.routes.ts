@@ -5,7 +5,10 @@ import {
     addEvent,
     updateEvent,
     deleteEvent,
-    uploadEventImage
+    uploadEventImage,
+    approveEvent,
+    getEventsByVenueId,
+    getEventsByOrganizer
 } from '../controllers/event.controller';
 import { verifyToken} from '../middlewares/verifyToken';
 import upload from '../middlewares/upload';
@@ -13,7 +16,9 @@ import upload from '../middlewares/upload';
 const router = express.Router();
 
 router.get('/events', getAllEvents);
-router.get('/events/geteventbyid/:id', verifyToken , getEventById);
+router.get('/events/geteventbyid/:id', getEventById); // Made public for viewing
+router.get('/events/venue/:venueId', getEventsByVenueId); // New route for events by venue
+router.get('/events/organizer/:organizerId', getEventsByOrganizer); // New route for events by organizer
 router.post('/events',verifyToken, addEvent);
 router.put('/events/update-event/:id',verifyToken, updateEvent);
 router.delete('/events/delete-event/:id', verifyToken, deleteEvent);
@@ -24,6 +29,8 @@ router.post('/events/:eventId/image',
   upload.single('image'), 
   uploadEventImage
 );
+
+router.post('/events/:eventId/approve', verifyToken, approveEvent);
 
 export default router;
 
