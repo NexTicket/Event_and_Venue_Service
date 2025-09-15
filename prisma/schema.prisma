@@ -35,22 +35,24 @@ model Venue {
 }
 
 model events {
-  id          Int         @id @default(autoincrement())
-  tenantId    Int
-  title       String
-  description String
-  category    String // Keep as String for now to preserve existing data
-  type        String
-  startDate   DateTime
-  endDate     DateTime?
-  startTime   String?
-  endTime     String?
-  created_at  DateTime?   @db.Timestamptz(6)
-  status      EventStatus @default(PENDING)
-  venueId     Int?
-  image       String?
-  Tenant      Tenant      @relation(fields: [tenantId], references: [id])
-  venue       Venue?      @relation(fields: [venueId], references: [id])
+  id                 Int         @id @default(autoincrement())
+  tenantId           Int
+  title              String
+  description        String
+  category           String
+  type               String
+  startDate          DateTime
+  endDate            DateTime?
+  created_at         DateTime?   @db.Timestamptz(6)
+  status             EventStatus @default(PENDING)
+  venueId            Int?
+  image              String?
+  endTime            String?
+  startTime          String?
+  checkinOfficerUids String[]    @default([])
+  eventAdminUid      String?
+  Tenant             Tenant      @relation(fields: [tenantId], references: [id])
+  venue              Venue?      @relation(fields: [venueId], references: [id])
 }
 
 enum EventStatus {
@@ -71,5 +73,3 @@ enum Category {
   WORKSHOP
   OTHER
 }
-
-

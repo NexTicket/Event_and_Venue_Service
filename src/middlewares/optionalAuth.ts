@@ -25,7 +25,8 @@ export const optionalAuth = async (req: Request, res: Response, next: NextFuncti
       'admin@nexticket.com', 
       'admin@company.com',
       'admin@test.com',
-      'test@admin.com'
+      'test@admin.com',
+      'hello@Hi.com'
     ];
     
     const isAdminEmail = decodedToken.email && (
