@@ -1,6 +1,7 @@
 import { PrismaClient } from "../../generated/prisma/index.js";
 import {Request, Response} from 'express';
 import { setUserRole } from "../utils/userRoles";
+import { ensureTenantExists } from '../utils/autoCreateTenant.js';
 
 
 // Extend the Express Request interface
@@ -62,22 +63,14 @@ export const addVenue = async (req: Request, res: Response) => {
   }
 
   try {
-    // 🔍 Find the tenant using Firebase UID
-    let tenant = await getPrisma().tenant.findUnique({
-      where: { firebaseUid: user.uid }
-    });
-
+    // Ensure user has a tenant record
+    const tenant = await ensureTenantExists(user);
+    
     if (!tenant) {
-      console.log(`Creating tenant for venue owner: ${user.uid}`);
-      tenant = await getPrisma().tenant.create({
-        data: {
-          firebaseUid: user.uid,
-          name: user.name || 'Venue Owner'
-        }
+      return res.status(400).json({
+        error: 'Unable to create tenant for user',
+        userRole: user.role
       });
-      console.log(`✅ Tenant created: ${tenant.id} for ${user.uid}`);
-    } else {
-      console.log(`✅ Tenant found: ${tenant.id} for ${user.uid}`);
     }
 
     const newVenue = await getPrisma().venue.create({
