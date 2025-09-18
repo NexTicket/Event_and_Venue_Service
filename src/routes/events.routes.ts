@@ -12,9 +12,9 @@ import {
     getEventsByOrganizer,
     getEventsByEventAdmin,
     getEventsByCheckinOfficer
-} from '../controllers/event.controller';
-import { verifyToken} from '../middlewares/verifyToken';
-import upload from '../middlewares/upload';
+} from '../controllers/event.controller.js';
+import { verifyToken} from '../middlewares/verifyToken.js';
+import upload from '../middlewares/upload.js';
 
 const router = express.Router();
 

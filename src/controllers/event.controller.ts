@@ -1,7 +1,33 @@
 import { PrismaClient } from "../../generated/prisma/index.js";
 import { Request,Response } from 'express';
-import cloudinary from '../utils/cloudinary';
-import { ensureTenantExists } from '../utils/autoCreateTenant.js';
+import cloudinary from '../utils/cloudinary.js';
+// Removed: import { ensureTenantExists } from '../utils/autoCreateTenant.js';
+// Now using User-Service API for tenant operations
+
+// Helper function to call User-Service for tenant operations
+const ensureTenantViaUserService = async (user: any, authToken: string) => {
+  try {
+    const userServiceUrl = process.env.USER_SERVICE_URL || 'http://localhost:4001';
+    const response = await fetch(`${userServiceUrl}/api/users/ensure-tenant`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${authToken}`
+      }
+    });
+
+    if (!response.ok) {
+      console.error('Failed to ensure tenant via User-Service:', response.status, await response.text());
+      return null;
+    }
+
+    const result = await response.json();
+    return result.data;
+  } catch (error) {
+    console.error('Error calling User-Service for tenant:', error);
+    return null;
+  }
+};
 
 
 // Extend the Express Request interface - this allows us to attach user data to the request object
@@ -348,8 +374,9 @@ export const addEvent = async (req: Request, res: Response) => {
 
     try {
         console.log('🏢 Ensuring tenant exists for user:', user.uid);
-        // Ensure user has a tenant record
-        const tenant = await ensureTenantExists(user);
+        // Ensure user has a tenant record via User-Service
+        const authToken = req.headers.authorization?.replace('Bearer ', '') || '';
+        const tenant = await ensureTenantViaUserService(user, authToken);
         
         if (!tenant) {
             console.log('❌ Failed to create/find tenant for user:', user.uid);
@@ -359,7 +386,7 @@ export const addEvent = async (req: Request, res: Response) => {
             });
         }
         
-        console.log('✅ Tenant found/created:', tenant.id); 
+        console.log('✅ Tenant found/created:', tenant.tenantId); 
         
         // Parse dates properly - handle both date-only and full datetime strings
         const parseEventDate = (dateString: string) => {
@@ -384,7 +411,7 @@ export const addEvent = async (req: Request, res: Response) => {
                 endDate: eventEndDate,
                 startTime: startTime ?? null,
                 endTime: endTime ?? null,
-                tenantId: tenant.id,
+                tenantId: (tenant as any).tenantId || tenant.id,
                 venueId: parsedVenueId,
                 image: image || null
             }
@@ -748,7 +775,7 @@ export const getEventsByOrganizer = async (req: Request, res: Response) => {
         // Fetch events for this tenant/organizer
         const events = await getPrisma().events.findMany({
             where: { 
-                tenantId: tenant.id
+                tenantId: (tenant as any).tenantId || tenant.id
                 // Note: Not filtering by status here so organizers can see all their events
             },
             select: {

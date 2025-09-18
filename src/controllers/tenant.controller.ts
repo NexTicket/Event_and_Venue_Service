@@ -1,150 +1,314 @@
-import { PrismaClient } from "../../generated/prisma/index.js";
 import { Request, Response } from 'express';
+import { PrismaClient } from '../../generated/prisma/index.js';
 
-// Lazy-load Prisma client
-let prisma: PrismaClient;
+const prisma = new PrismaClient();
 
-function getPrisma() {
-  if (!prisma) {
-    prisma = new PrismaClient();
-  }
-  return prisma;
-}
-
-// Create a new tenant when user role is approved
-export const createTenant = async (req: Request, res: Response) => {
-  const { firebaseUid, name, email, role } = req.body;
-  const user = req.user; // This comes from verifyToken middleware
-  
-  // Log the request for debugging
-  console.log('CreateTenant request:', { firebaseUid, name, email, role });
-  console.log('Authenticated user:', user);
-  
-  // Validate required fields
-  if (!firebaseUid || !name || !role) {
-    return res.status(400).json({ 
-      error: 'Missing required fields: firebaseUid, name, and role are required' 
-    });
-  }
-
-  // Validate role
-  if (!['venue_owner', 'organizer', 'event_admin', 'checkin_officer'].includes(role)) {
-    return res.status(400).json({ 
-      error: 'Invalid role. Only venue_owner, organizer, event_admin, and checkin_officer roles can create tenants' 
-    });
-  }
-
+// Create a new tenant
+export const createTenant = async (req: Request, res: Response): Promise<Response> => {
   try {
-    // Check if tenant already exists
-    const existingTenant = await getPrisma().tenant.findUnique({
+    const { name, firebaseUid } = req.body;
+
+    if (!name || !firebaseUid) {
+      return res.status(400).json({
+        error: 'Missing required fields',
+        required: ['name', 'firebaseUid']
+      });
+    }
+
+    // Check if tenant with this firebaseUid already exists
+    const existingTenant = await prisma.tenant.findUnique({
       where: { firebaseUid }
     });
 
     if (existingTenant) {
-      console.log(`✅ Tenant already exists for ${firebaseUid}: ${existingTenant.id}`);
       return res.status(200).json({
-        data: existingTenant,
-        message: 'Tenant already exists'
+        message: 'Tenant already exists',
+        tenant: existingTenant
       });
     }
 
     // Create new tenant
-    const tenant = await getPrisma().tenant.create({
+    const tenant = await prisma.tenant.create({
       data: {
-        firebaseUid,
         name,
-        createdAt: new Date()
+        firebaseUid
       }
     });
 
-    console.log(`✅ Tenant created for ${role}: ${email} (${firebaseUid}) - ID: ${tenant.id}`);
-
-    res.status(201).json({
-      data: tenant,
-      message: 'Tenant created successfully'
+    return res.status(201).json({
+      message: 'Tenant created successfully',
+      tenant
     });
 
   } catch (error) {
-    console.error('Failed to create tenant:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    console.error('Error creating tenant:', error);
+    return res.status(500).json({
+      error: 'Failed to create tenant',
+      details: error instanceof Error ? error.message : 'Unknown error'
+    });
   }
 };
 
 // Get tenant by Firebase UID
-export const getTenantByFirebaseUid = async (req: Request, res: Response) => {
-  const { firebaseUid } = req.params;
-  
-  if (!firebaseUid) {
-    return res.status(400).json({ error: 'Firebase UID is required' });
-  }
-
+export const getTenantByFirebaseUid = async (req: Request, res: Response): Promise<Response> => {
   try {
-    const tenant = await getPrisma().tenant.findUnique({
+    const { firebaseUid } = req.params;
+
+    if (!firebaseUid) {
+      return res.status(400).json({
+        error: 'firebaseUid parameter is required'
+      });
+    }
+
+    const tenant = await prisma.tenant.findUnique({
       where: { firebaseUid },
-      include: { venues: true }
+      include: {
+        venues: true,
+        events: true
+      }
     });
 
     if (!tenant) {
-      return res.status(404).json({ error: 'Tenant not found' });
+      return res.status(404).json({
+        error: 'Tenant not found',
+        firebaseUid
+      });
     }
 
-    res.status(200).json({
-      data: tenant,
-      message: 'Tenant fetched successfully'
+    return res.status(200).json({
+      tenant
     });
 
   } catch (error) {
-    console.error('Failed to fetch tenant:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    console.error('Error fetching tenant:', error);
+    return res.status(500).json({
+      error: 'Failed to fetch tenant',
+      details: error instanceof Error ? error.message : 'Unknown error'
+    });
   }
 };
 
-// Update tenant information
-export const updateTenant = async (req: Request, res: Response) => {
-  const { id } = req.params;
-  const { name } = req.body;
-  
-  if (!id || !name) {
-    return res.status(400).json({ error: 'ID and name are required' });
-  }
-
+// Get tenant by ID
+export const getTenantById = async (req: Request, res: Response): Promise<Response> => {
   try {
-    const tenant = await getPrisma().tenant.update({
-      where: { id: parseInt(id) },
-      data: { name }
+    const { id } = req.params;
+    const tenantId = parseInt(id);
+
+    if (isNaN(tenantId)) {
+      return res.status(400).json({
+        error: 'Invalid tenant ID'
+      });
+    }
+
+    const tenant = await prisma.tenant.findUnique({
+      where: { id: tenantId },
+      include: {
+        venues: true,
+        events: true
+      }
     });
 
-    res.status(200).json({
-      data: tenant,
-      message: 'Tenant updated successfully'
+    if (!tenant) {
+      return res.status(404).json({
+        error: 'Tenant not found',
+        id: tenantId
+      });
+    }
+
+    return res.status(200).json({
+      tenant
     });
 
   } catch (error) {
-    console.error('Failed to update tenant:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    console.error('Error fetching tenant:', error);
+    return res.status(500).json({
+      error: 'Failed to fetch tenant',
+      details: error instanceof Error ? error.message : 'Unknown error'
+    });
   }
 };
 
 // Get all tenants (admin only)
-export const getAllTenants = async (req: Request, res: Response) => {
-  const user = req.user;
-
-  if (!user || user.role !== 'admin') {
-    return res.status(403).json({ error: 'Only admins can view all tenants' });
-  }
-
+export const getAllTenants = async (req: Request, res: Response): Promise<Response> => {
   try {
-    const tenants = await getPrisma().tenant.findMany({
-      include: { venues: true }
+    const tenants = await prisma.tenant.findMany({
+      include: {
+        venues: true,
+        events: true
+      },
+      orderBy: {
+        createdAt: 'desc'
+      }
     });
 
-    res.status(200).json({
-      data: tenants,
-      message: 'All tenants fetched successfully'
+    return res.status(200).json({
+      tenants,
+      count: tenants.length
     });
 
   } catch (error) {
-    console.error('Failed to fetch tenants:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    console.error('Error fetching tenants:', error);
+    return res.status(500).json({
+      error: 'Failed to fetch tenants',
+      details: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+};
+
+// Update tenant
+export const updateTenant = async (req: Request, res: Response): Promise<Response> => {
+  try {
+    const { id } = req.params;
+    const tenantId = parseInt(id);
+    const { name } = req.body;
+
+    if (isNaN(tenantId)) {
+      return res.status(400).json({
+        error: 'Invalid tenant ID'
+      });
+    }
+
+    if (!name) {
+      return res.status(400).json({
+        error: 'Name is required for update'
+      });
+    }
+
+    const tenant = await prisma.tenant.update({
+      where: { id: tenantId },
+      data: { name },
+      include: {
+        venues: true,
+        events: true
+      }
+    });
+
+    return res.status(200).json({
+      message: 'Tenant updated successfully',
+      tenant
+    });
+
+  } catch (error) {
+    console.error('Error updating tenant:', error);
+    
+    if (error instanceof Error && error.message.includes('Record to update not found')) {
+      return res.status(404).json({
+        error: 'Tenant not found'
+      });
+    }
+
+    return res.status(500).json({
+      error: 'Failed to update tenant',
+      details: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+};
+
+// Delete tenant (admin only - be careful with this)
+export const deleteTenant = async (req: Request, res: Response): Promise<Response> => {
+  try {
+    const { id } = req.params;
+    const tenantId = parseInt(id);
+
+    if (isNaN(tenantId)) {
+      return res.status(400).json({
+        error: 'Invalid tenant ID'
+      });
+    }
+
+    // Check if tenant has associated venues or events
+    const tenant = await prisma.tenant.findUnique({
+      where: { id: tenantId },
+      include: {
+        venues: true,
+        events: true
+      }
+    });
+
+    if (!tenant) {
+      return res.status(404).json({
+        error: 'Tenant not found'
+      });
+    }
+
+    if (tenant.venues.length > 0 || tenant.events.length > 0) {
+      return res.status(400).json({
+        error: 'Cannot delete tenant with associated venues or events',
+        venueCount: tenant.venues.length,
+        eventCount: tenant.events.length
+      });
+    }
+
+    await prisma.tenant.delete({
+      where: { id: tenantId }
+    });
+
+    return res.status(200).json({
+      message: 'Tenant deleted successfully',
+      deletedTenant: {
+        id: tenantId,
+        name: tenant.name
+      }
+    });
+
+  } catch (error) {
+    console.error('Error deleting tenant:', error);
+    return res.status(500).json({
+      error: 'Failed to delete tenant',
+      details: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+};
+
+// Ensure tenant exists (used by User-Service)
+export const ensureTenantExists = async (req: Request, res: Response): Promise<Response> => {
+  try {
+    const { firebaseUid, name } = req.body;
+
+    if (!firebaseUid) {
+      return res.status(400).json({
+        error: 'firebaseUid is required'
+      });
+    }
+
+    // Try to find existing tenant
+    let tenant = await prisma.tenant.findUnique({
+      where: { firebaseUid }
+    });
+
+    // If tenant doesn't exist, create it
+    if (!tenant) {
+      if (!name) {
+        return res.status(400).json({
+          error: 'name is required when creating a new tenant'
+        });
+      }
+
+      tenant = await prisma.tenant.create({
+        data: {
+          name,
+          firebaseUid
+        }
+      });
+
+      return res.status(201).json({
+        message: 'Tenant created successfully',
+        tenant,
+        created: true
+      });
+    }
+
+    return res.status(200).json({
+      message: 'Tenant already exists',
+      tenant,
+      created: false
+    });
+
+  } catch (error) {
+    console.error('Error ensuring tenant exists:', error);
+    return res.status(500).json({
+      error: 'Failed to ensure tenant exists',
+      details: error instanceof Error ? error.message : 'Unknown error'
+    });
   }
 };
