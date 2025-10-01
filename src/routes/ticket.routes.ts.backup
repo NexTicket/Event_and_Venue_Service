@@ -1,0 +1,57 @@
+import { Router } from 'express';
+import {
+  // BulkTicket operations
+  createBulkTicket,
+  getBulkTicketsByEvent,
+  updateBulkTicket,
+  
+  // Cart operations
+  addToCart,
+  getCartItems,
+  updateCartItem,
+  removeFromCart,
+  
+  // Order operations
+  createOrder,
+  getUserOrders,
+  updateOrderStatus,
+  
+  // Ticket operations
+  createUserTickets,
+  getUserTickets,
+  
+  // Transaction operations
+  createTransaction,
+  updateTransactionStatus,
+} from '../controllers/ticket.controller';
+
+const router = Router();
+
+// BulkTicket routes
+router.post('/bulk-tickets', createBulkTicket);
+router.get('/bulk-tickets/event/:eventId', getBulkTicketsByEvent);
+router.put('/bulk-tickets/:id', updateBulkTicket);
+
+// Cart routes
+router.post('/cart', addToCart);
+router.get('/cart/:firebaseUid', getCartItems);
+router.put('/cart/:id', updateCartItem);
+router.delete('/cart/:id', removeFromCart);
+
+// Order routes
+router.post('/orders', createOrder);
+router.get('/orders/:firebaseUid', getUserOrders);
+router.put('/orders/:id', updateOrderStatus);
+
+// Ticket routes
+router.post('/tickets', createUserTickets);
+router.get('/tickets/:firebaseUid', getUserTickets);
+
+// Transaction routes
+router.post('/transactions', createTransaction);
+router.put('/transactions/:id', updateTransactionStatus);
+
+// Compatibility routes for existing frontend (matching the old Ticket Service endpoints)
+router.get('/venues-events/bulk-tickets/event/:eventId', getBulkTicketsByEvent);
+
+export default router;

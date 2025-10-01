@@ -1,0 +1,689 @@
+import { Request, Response } from 'express';
+import { PrismaClient, SeatType, TicketStatus, OrderStatus, TransactionStatus } from '../../generated/prisma/index.js';
+
+const prisma = new PrismaClient();
+
+// BulkTicket Operations
+export const createBulkTicket = async (req: Request, res: Response) => {
+  try {
+    const {
+      eventId,
+      venueId,
+      seatType,
+      price,
+      totalSeats,
+      seatPrefix
+    } = req.body;
+
+    const bulkTicket = await prisma.bulkTicket.create({
+      data: {
+        eventId: parseInt(eventId),
+        venueId: parseInt(venueId),
+        seatType: seatType as SeatType,
+        price: parseFloat(price),
+        totalSeats: parseInt(totalSeats),
+        availableSeats: parseInt(totalSeats), // Initially all seats are available
+        seatPrefix,
+      },
+      include: {
+        event: true,
+        venue: true,
+      },
+    });
+
+    res.status(201).json(bulkTicket);
+  } catch (error) {
+    console.error('Error creating bulk ticket:', error);
+    res.status(500).json({ error: 'Failed to create bulk ticket' });
+  }
+};
+
+export const getBulkTicketsByEvent = async (req: Request, res: Response) => {
+  try {
+    const { eventId } = req.params;
+
+    const bulkTickets = await prisma.bulkTicket.findMany({
+      where: {
+        eventId: parseInt(eventId),
+      },
+      include: {
+        event: true,
+        venue: true,
+      },
+    });
+
+    res.json(bulkTickets);
+  } catch (error) {
+    console.error('Error fetching bulk tickets:', error);
+    res.status(500).json({ error: 'Failed to fetch bulk tickets' });
+  }
+};
+
+export const updateBulkTicket = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { price, availableSeats } = req.body;
+
+    const bulkTicket = await prisma.bulkTicket.update({
+      where: { id: parseInt(id) },
+      data: {
+        ...(price !== undefined && { price: parseFloat(price) }),
+        ...(availableSeats !== undefined && { availableSeats: parseInt(availableSeats) }),
+      },
+      include: {
+        event: true,
+        venue: true,
+      },
+    });
+
+    res.json(bulkTicket);
+  } catch (error) {
+    console.error('Error updating bulk ticket:', error);
+    res.status(500).json({ error: 'Failed to update bulk ticket' });
+  }
+};
+
+// Cart Operations
+export const addToCart = async (req: Request, res: Response) => {
+  try {
+    console.log('🛒 addToCart API called');
+    console.log('📝 Request body:', req.body);
+    
+    const {
+      firebaseUid,
+      eventId,
+      seatIds,
+      seats,
+      totalAmount,
+      bulkTicketId, // For backward compatibility
+      preferredSeatIds, // For backward compatibility
+      quantity // For backward compatibility
+    } = req.body;
+
+    // Handle new seat-based cart format
+    if (eventId && seatIds && seats) {
+      console.log('🆕 Processing new seat-based cart format');
+      console.log('Adding seats to cart:', { firebaseUid, eventId, seatIds, totalAmount });
+
+      // Test database connection first
+      await prisma.$connect();
+      console.log('Database connection established for addToCart');
+
+      // Create individual cart items for each seat
+      const cartItems = [];
+      
+      for (let i = 0; i < seats.length; i++) {
+        const seat = seats[i];
+        
+        const cartItem = await prisma.cartItem.create({
+          data: {
+            firebaseUid,
+            eventId: parseInt(eventId),
+            seatId: seat.seatId,
+            seatType: seat.seatType as SeatType,
+            price: parseFloat(seat.price.toString()),
+            quantity: 1,
+            preferredSeatIds: JSON.stringify([seat.seatId]), // Add this field
+            seatInfo: JSON.stringify({
+              section: seat.section,
+              row: seat.row,
+              number: seat.number
+            })
+          }
+        });
+
+        cartItems.push(cartItem);
+        console.log(`✅ Created cart item for seat ${seat.seatId}:`, cartItem.id);
+      }
+
+      console.log('🎉 All cart items created successfully');
+      return res.status(201).json({
+        message: `Added ${cartItems.length} seat(s) to cart`,
+        cartItems: cartItems,
+        totalAmount: totalAmount
+      });
+    }
+
+    // Handle legacy bulk ticket format
+    console.log('🔄 Processing legacy bulk ticket format');
+    console.log('Adding to cart:', { firebaseUid, bulkTicketId, preferredSeatIds, quantity });
+
+    // Test database connection first
+    await prisma.$connect();
+    console.log('Database connection established for addToCart');
+
+    // Check if bulk ticket exists and has enough available seats
+    const bulkTicket = await prisma.bulkTicket.findUnique({
+      where: { id: parseInt(bulkTicketId) },
+    });
+
+    console.log('🎫 Found bulk ticket:', bulkTicket ? `ID ${bulkTicket.id}, Available: ${bulkTicket.availableSeats}` : 'NOT FOUND');
+
+    if (!bulkTicket) {
+      console.log('❌ Bulk ticket not found');
+      return res.status(404).json({ error: 'Bulk ticket not found' });
+    }
+
+    if (bulkTicket.availableSeats < parseInt(quantity)) {
+      console.log('❌ Not enough seats available');
+      return res.status(400).json({ error: 'Not enough seats available' });
+    }
+
+    const cartItem = await prisma.cartItem.create({
+      data: {
+        firebaseUid,
+        bulkTicketId: parseInt(bulkTicketId),
+        preferredSeatIds: JSON.stringify(preferredSeatIds || []),
+        quantity: parseInt(quantity),
+      },
+      include: {
+        bulkTicket: {
+          include: {
+            event: true,
+            venue: true,
+          },
+        },
+      },
+    });
+
+    console.log('✅ Cart item created successfully:', cartItem.id);
+    res.status(201).json(cartItem);
+  } catch (error) {
+    console.error('❌ Error adding to cart:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    res.status(500).json({ error: 'Failed to add to cart', details: errorMessage });
+  }
+};
+
+export const getCartItems = async (req: Request, res: Response) => {
+  try {
+    const { firebaseUid } = req.params;
+    console.log('Getting cart items for Firebase UID:', firebaseUid);
+
+    // Test database connection first
+    await prisma.$connect();
+    console.log('Database connection established');
+
+    const cartItems = await prisma.cartItem.findMany({
+      where: { firebaseUid },
+      include: {
+        bulkTicket: {
+          include: {
+            event: true,
+            venue: true,
+          },
+        },
+        event: {
+          include: {
+            venue: true,
+          },
+        },
+      },
+    });
+
+    console.log('Found cart items:', cartItems.length);
+
+    const totalAmount = cartItems.reduce((sum, item) => {
+      if (item.bulkTicket && item.bulkTicket.price) {
+        // Bulk ticket item
+        return sum + (item.bulkTicket.price * item.quantity);
+      } else if (item.seatInfo) {
+        // Individual seat item - parse seatInfo to get price
+        try {
+          const seatData = JSON.parse(item.seatInfo);
+          return sum + (seatData.price || 0);
+        } catch (e) {
+          console.warn('Could not parse seatInfo for cart item:', item.id);
+          return sum;
+        }
+      }
+      return sum;
+    }, 0);
+
+    res.json({
+      total_items: cartItems.length,
+      total_amount: totalAmount,
+      items: cartItems,
+    });
+  } catch (error) {
+    console.error('Error fetching cart items:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    res.status(500).json({ error: 'Failed to fetch cart items', details: errorMessage });
+  }
+};
+
+export const updateCartItem = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { quantity, preferredSeatIds } = req.body;
+
+    // Build update data object
+    const updateData: any = {};
+    if (quantity !== undefined) {
+      updateData.quantity = parseInt(quantity);
+    }
+    if (preferredSeatIds !== undefined) {
+      updateData.preferredSeatIds = JSON.stringify(preferredSeatIds);
+    }
+
+    const cartItem = await prisma.cartItem.update({
+      where: { id: parseInt(id) },
+      data: updateData,
+      include: {
+        bulkTicket: {
+          include: {
+            event: true,
+            venue: true,
+          },
+        },
+      },
+    });
+
+    res.json(cartItem);
+  } catch (error) {
+    console.error('Error updating cart item:', error);
+    res.status(500).json({ error: 'Failed to update cart item' });
+  }
+};
+
+export const removeFromCart = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+
+    await prisma.cartItem.delete({
+      where: { id: parseInt(id) },
+    });
+
+    res.status(204).send();
+  } catch (error) {
+    console.error('Error removing from cart:', error);
+    res.status(500).json({ error: 'Failed to remove from cart' });
+  }
+};
+
+// Order Operations
+export const createOrder = async (req: Request, res: Response) => {
+  try {
+    const {
+      firebaseUid,
+      paymentMethod,
+      totalAmount,
+      serviceFee = 0,
+      notes
+    } = req.body;
+
+    console.log('Creating order for Firebase UID:', firebaseUid);
+
+    // Test database connection first
+    await prisma.$connect();
+    console.log('Database connection established for createOrder');
+
+    // Get cart items first to calculate total if not provided
+    const cartItems = await prisma.cartItem.findMany({
+      where: { firebaseUid },
+      include: {
+        bulkTicket: {
+          include: {
+            event: true,
+            venue: true,
+          },
+        },
+      },
+    });
+
+    if (cartItems.length === 0) {
+      return res.status(400).json({ error: 'No items in cart to create order' });
+    }
+
+    // Calculate total amount from cart if not provided
+    const calculatedTotal = cartItems.reduce((sum, item) => {
+      if (item.bulkTicket && item.bulkTicket.price) {
+        // Bulk ticket item
+        return sum + (item.bulkTicket.price * item.quantity);
+      } else if (item.price) {
+        // Individual seat item
+        return sum + item.price;
+      }
+      return sum;
+    }, 0);
+
+    // Generate unique order reference
+    const orderReference = `ORD-${Date.now()}-${Math.random().toString(36).substr(2, 6).toUpperCase()}`;
+
+    // Use transaction to ensure all operations succeed or fail together
+    const result = await prisma.$transaction(async (prisma) => {
+      // 1. Create the order
+      const order = await prisma.userOrder.create({
+        data: {
+          firebaseUid,
+          orderReference,
+          totalAmount: parseFloat(totalAmount?.toString() || calculatedTotal.toString()),
+          serviceFee: parseFloat(serviceFee?.toString() || '0'),
+          status: 'PENDING' as any,
+          notes,
+        },
+      });
+
+      // 2. Create user tickets for each cart item
+      const userTickets = [];
+      for (const cartItem of cartItems) {
+        if (cartItem.bulkTicket) {
+          // Handle bulk ticket items
+          const preferredSeats = JSON.parse(cartItem.preferredSeatIds || '[]');
+          
+          // Create individual tickets for each seat
+          for (let i = 0; i < cartItem.quantity; i++) {
+            const seatId = preferredSeats[i] || `${cartItem.bulkTicket.seatPrefix}${i + 1}`;
+            
+            const userTicket = await prisma.userTicket.create({
+              data: {
+                firebaseUid,
+                bulkTicketId: cartItem.bulkTicketId!,
+                orderId: order.id,
+                seatId,
+                pricePaid: cartItem.bulkTicket.price,
+                status: 'SOLD' as any,
+                qrCodeData: `${order.orderReference}-${seatId}`,
+              },
+            });
+            
+            userTickets.push(userTicket);
+          }
+
+          // Update bulk ticket available seats
+          await prisma.bulkTicket.update({
+            where: { id: cartItem.bulkTicketId! },
+            data: {
+              availableSeats: {
+                decrement: cartItem.quantity,
+              },
+            },
+          });
+        } else if (cartItem.eventId && cartItem.seatId) {
+          // Handle individual seat items
+          const seatData = cartItem.seatInfo ? JSON.parse(cartItem.seatInfo) : {};
+          
+          const userTicket = await prisma.userTicket.create({
+            data: {
+              firebaseUid,
+              orderId: order.id,
+              eventId: cartItem.eventId,
+              seatId: cartItem.seatId,
+              pricePaid: cartItem.price || 0,
+              status: 'RESERVED' as any, // Keep as RESERVED until payment confirmation
+              qrCodeData: `${order.orderReference}-${cartItem.seatId}`,
+            },
+          });
+          
+          userTickets.push(userTicket);
+          
+          // Update seat reservation status to link with order
+          await prisma.seatReservation.updateMany({
+            where: {
+              eventId: cartItem.eventId,
+              seatId: cartItem.seatId,
+              firebaseUid,
+              status: 'RESERVED'
+            },
+            data: {
+              orderId: order.id,
+              status: 'CONFIRMED' as any
+            }
+          });
+        }
+      }
+
+      // 4. Clear the cart
+      await prisma.cartItem.deleteMany({
+        where: { firebaseUid },
+      });
+
+      return { order, userTickets };
+    });
+
+    console.log('Order created successfully with tickets:', result.order.id);
+    res.status(201).json({
+      ...result.order,
+      ticketsCreated: result.userTickets.length,
+    });
+  } catch (error) {
+    console.error('Error creating order:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    res.status(500).json({ error: 'Failed to create order', details: errorMessage });
+  }
+};
+
+export const getUserOrders = async (req: Request, res: Response) => {
+  try {
+    const { firebaseUid } = req.params;
+
+    const orders = await prisma.userOrder.findMany({
+      where: { firebaseUid },
+      include: {
+        userTickets: {
+          include: {
+            bulkTicket: {
+              include: {
+                event: true,
+                venue: true,
+              },
+            },
+          },
+        },
+        transactions: true,
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    res.json(orders);
+  } catch (error) {
+    console.error('Error fetching user orders:', error);
+    res.status(500).json({ error: 'Failed to fetch user orders' });
+  }
+};
+
+export const updateOrderStatus = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { status, paymentIntentId, stripePaymentId } = req.body;
+
+    // Use transaction to ensure consistency
+    const result = await prisma.$transaction(async (prisma) => {
+      const order = await prisma.userOrder.update({
+        where: { id: parseInt(id) },
+        data: {
+          status: status as OrderStatus,
+          ...(paymentIntentId && { paymentIntentId }),
+          ...(stripePaymentId && { stripePaymentId }),
+          ...(status === OrderStatus.COMPLETED && { completedAt: new Date() }),
+        },
+        include: {
+          userTickets: true,
+          seatReservations: true,
+          transactions: true,
+        },
+      });
+
+      // Handle status transitions for tickets and reservations
+      if (status === OrderStatus.COMPLETED) {
+        // Mark all tickets as SOLD
+        await prisma.userTicket.updateMany({
+          where: { orderId: parseInt(id) },
+          data: { status: 'SOLD' as any }
+        });
+
+        // Mark seat reservations as SOLD
+        await prisma.seatReservation.updateMany({
+          where: { orderId: parseInt(id) },
+          data: { status: 'SOLD' as any }
+        });
+      } else if (status === OrderStatus.CANCELLED) {
+        // Release seat reservations
+        await prisma.seatReservation.updateMany({
+          where: { orderId: parseInt(id) },
+          data: { 
+            status: 'CANCELLED' as any,
+            orderId: null
+          }
+        });
+
+        // Mark tickets as cancelled
+        await prisma.userTicket.updateMany({
+          where: { orderId: parseInt(id) },
+          data: { status: 'CANCELLED' as any }
+        });
+      }
+
+      return order;
+    });
+
+    res.json(result);
+  } catch (error) {
+    console.error('Error updating order status:', error);
+    res.status(500).json({ error: 'Failed to update order status' });
+  }
+};
+
+// Ticket Operations
+export const createUserTickets = async (req: Request, res: Response) => {
+  try {
+    const {
+      orderId,
+      bulkTicketId,
+      firebaseUid,
+      seatIds,
+      pricePaid
+    } = req.body;
+
+    const tickets = [];
+
+    for (const seatId of seatIds) {
+      const qrCodeData = JSON.stringify({
+        ticketId: `${orderId}-${seatId}`,
+        seatId,
+        orderId,
+        firebaseUid,
+        timestamp: new Date().toISOString(),
+      });
+
+      const ticket = await prisma.userTicket.create({
+        data: {
+          orderId: parseInt(orderId),
+          bulkTicketId: parseInt(bulkTicketId),
+          firebaseUid,
+          seatId,
+          pricePaid: parseFloat(pricePaid),
+          status: TicketStatus.SOLD,
+          qrCodeData,
+        },
+        include: {
+          order: true,
+          bulkTicket: {
+            include: {
+              event: true,
+              venue: true,
+            },
+          },
+        },
+      });
+
+      tickets.push(ticket);
+    }
+
+    // Update available seats in bulk ticket
+    await prisma.bulkTicket.update({
+      where: { id: parseInt(bulkTicketId) },
+      data: {
+        availableSeats: {
+          decrement: seatIds.length,
+        },
+      },
+    });
+
+    res.status(201).json(tickets);
+  } catch (error) {
+    console.error('Error creating user tickets:', error);
+    res.status(500).json({ error: 'Failed to create user tickets' });
+  }
+};
+
+export const getUserTickets = async (req: Request, res: Response) => {
+  try {
+    const { firebaseUid } = req.params;
+
+    const tickets = await prisma.userTicket.findMany({
+      where: { firebaseUid },
+      include: {
+        order: true,
+        bulkTicket: {
+          include: {
+            event: true,
+            venue: true,
+          },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    res.json(tickets);
+  } catch (error) {
+    console.error('Error fetching user tickets:', error);
+    res.status(500).json({ error: 'Failed to fetch user tickets' });
+  }
+};
+
+// Transaction Operations
+export const createTransaction = async (req: Request, res: Response) => {
+  try {
+    const {
+      orderId,
+      amount,
+      paymentMethod,
+      transactionReference
+    } = req.body;
+
+    const transactionId = `TXN-${Math.random().toString(36).substr(2, 8).toUpperCase()}`;
+
+    const transaction = await prisma.transaction.create({
+      data: {
+        orderId: parseInt(orderId),
+        transactionId,
+        amount: parseFloat(amount),
+        paymentMethod,
+        transactionReference,
+        status: TransactionStatus.PENDING,
+      },
+      include: {
+        order: true,
+      },
+    });
+
+    res.status(201).json(transaction);
+  } catch (error) {
+    console.error('Error creating transaction:', error);
+    res.status(500).json({ error: 'Failed to create transaction' });
+  }
+};
+
+export const updateTransactionStatus = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { status, transactionReference } = req.body;
+
+    const transaction = await prisma.transaction.update({
+      where: { id: parseInt(id) },
+      data: {
+        status: status as TransactionStatus,
+        ...(transactionReference && { transactionReference }),
+      },
+      include: {
+        order: true,
+      },
+    });
+
+    res.json(transaction);
+  } catch (error) {
+    console.error('Error updating transaction status:', error);
+    res.status(500).json({ error: 'Failed to update transaction status' });
+  }
+};

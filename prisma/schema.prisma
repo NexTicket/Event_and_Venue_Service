@@ -30,8 +30,9 @@ model Venue {
   description   String?
   featuredImage String?
   images        String[]
-  tenant        Tenant   @relation(fields: [tenantId], references: [id])
+  tenant        Tenant      @relation(fields: [tenantId], references: [id])
   events        events[]
+  bulkTickets   BulkTicket[]
 }
 
 model events {
@@ -51,8 +52,12 @@ model events {
   startTime          String?
   checkinOfficerUids String[]    @default([])
   eventAdminUid      String?
-  Tenant             Tenant      @relation(fields: [tenantId], references: [id])
-  venue              Venue?      @relation(fields: [venueId], references: [id])
+  Tenant             Tenant       @relation(fields: [tenantId], references: [id])
+  venue              Venue?       @relation(fields: [venueId], references: [id])
+  bulkTickets        BulkTicket[]
+  cartItems          CartItem[]
+  userTickets        UserTicket[] // Add relation for individual seat tickets
+  seatReservations   SeatReservation[] // Add relation for seat reservations
 }
 
 enum EventStatus {
@@ -72,4 +77,160 @@ enum Category {
   FESTIVAL
   WORKSHOP
   OTHER
+}
+
+// Ticket and Order related models
+enum SeatType {
+  VIP
+  REGULAR
+}
+
+enum TicketStatus {
+  AVAILABLE
+  RESERVED
+  SOLD
+  CANCELLED
+}
+
+enum OrderStatus {
+  PENDING
+  CONFIRMED
+  CANCELLED
+  COMPLETED
+}
+
+enum TransactionStatus {
+  PENDING
+  SUCCESS
+  FAILED
+  REFUNDED
+}
+
+model BulkTicket {
+  id              Int      @id @default(autoincrement())
+  eventId         Int
+  venueId         Int
+  seatType        SeatType
+  price           Float
+  totalSeats      Int
+  availableSeats  Int
+  seatPrefix      String
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  // Relationships
+  event      events     @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  venue      Venue      @relation(fields: [venueId], references: [id], onDelete: Cascade)
+  cartItems  CartItem[]
+  userTickets UserTicket[]
+
+  @@map("bulk_tickets")
+}
+
+model CartItem {
+  id                Int      @id @default(autoincrement())
+  firebaseUid       String
+  bulkTicketId      Int?     // Make optional for individual seat bookings
+  eventId           Int?     // Add eventId for direct event seat bookings  
+  seatId            String?  // Individual seat ID
+  seatType          SeatType? // VIP or REGULAR
+  price             Float?   // Individual seat price
+  seatInfo          String?  // JSON string with seat details (section, row, number)
+  preferredSeatIds  String?  // JSON string of preferred seat IDs (for bulk tickets)
+  quantity          Int      @default(1)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  // Relationships
+  bulkTicket BulkTicket? @relation(fields: [bulkTicketId], references: [id], onDelete: Cascade)
+  event      events?     @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@map("cart_items")
+}
+
+model UserOrder {
+  id               Int       @id @default(autoincrement())
+  firebaseUid      String
+  orderReference   String    @unique
+  paymentIntentId  String?   @unique
+  stripePaymentId  String?
+  totalAmount      Float
+  serviceFee       Float     @default(0.0)
+  status           OrderStatus @default(PENDING)
+  notes            String?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+  completedAt      DateTime?
+
+  // Relationships
+  userTickets     UserTicket[]
+  transactions    Transaction[]
+  seatReservations SeatReservation[]
+
+  @@map("user_orders")
+}
+
+model UserTicket {
+  id           Int          @id @default(autoincrement())
+  orderId      Int
+  bulkTicketId Int?         // Make optional for individual seat bookings
+  eventId      Int?         // Add eventId for direct event bookings
+  firebaseUid  String
+  seatId       String
+  pricePaid    Float
+  status       TicketStatus @default(SOLD)
+  qrCodeData   String       @default("")
+  createdAt    DateTime     @default(now())
+
+  // Relationships
+  order      UserOrder  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  bulkTicket BulkTicket? @relation(fields: [bulkTicketId], references: [id], onDelete: Cascade)
+  event      events?     @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@map("user_tickets")
+}
+
+model SeatReservation {
+  id          Int      @id @default(autoincrement())
+  eventId     Int
+  seatId      String
+  firebaseUid String
+  status      ReservationStatus @default(RESERVED)
+  expiresAt   DateTime // Reservation expires after certain time
+  orderId     Int?     // Optional link to order when reservation is confirmed
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relationships
+  event       events     @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  order       UserOrder? @relation(fields: [orderId], references: [id], onDelete: SetNull)
+
+  // Unique constraint to prevent double booking
+  @@unique([eventId, seatId])
+  @@map("seat_reservations")
+}
+
+enum ReservationStatus {
+  RESERVED   // Temporarily reserved when added to cart
+  CONFIRMED  // Confirmed when order is created
+  SOLD       // Ticket purchased and payment completed
+  EXPIRED    // Reservation expired
+  CANCELLED  // Manually cancelled
+}
+
+model Transaction {
+  id                   Int               @id @default(autoincrement())
+  orderId              Int
+  transactionId        String            @unique
+  amount               Float
+  paymentMethod        String
+  transactionReference String?
+  status               TransactionStatus @default(PENDING)
+  createdAt            DateTime          @default(now())
+  updatedAt            DateTime          @updatedAt
+
+  // Relationships
+  order UserOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@map("transactions")
 }
