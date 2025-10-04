@@ -9,6 +9,16 @@ datasource db {
   directUrl = env("DIRECT_URL")
 }
 
+enum VenueType {
+  STADIUM_INDOOR
+  STADIUM_OUTDOOR
+  THEATRE
+  CONFERENCE_HALL
+  MUSIC_VENUE
+  MOVIE_THEATER
+  OPEN_AREA
+}
+
 model Tenant {
   id          Int      @id @default(autoincrement())
   name        String
@@ -19,7 +29,7 @@ model Tenant {
 }
 
 model Venue {
-  id            Int      @id @default(autoincrement())
+  id            Int            @id @default(autoincrement())
   name          String
   seatMap       Json
   tenantId      Int
@@ -30,12 +40,14 @@ model Venue {
   description   String?
   featuredImage String?
   images        String[]
-  tenant        Tenant   @relation(fields: [tenantId], references: [id])
+  type          VenueType?
+  tenant        Tenant         @relation(fields: [tenantId], references: [id])
+  bulk_tickets  bulk_tickets[]
   events        events[]
 }
 
 model events {
-  id                 Int         @id @default(autoincrement())
+  id                 Int                 @id @default(autoincrement())
   tenantId           Int
   title              String
   description        String
@@ -43,16 +55,206 @@ model events {
   type               String
   startDate          DateTime
   endDate            DateTime?
-  created_at         DateTime?   @db.Timestamptz(6)
-  status             EventStatus @default(PENDING)
+  created_at         DateTime?           @db.Timestamptz(6)
+  status             EventStatus         @default(PENDING)
   venueId            Int?
   image              String?
   endTime            String?
   startTime          String?
-  checkinOfficerUids String[]    @default([])
+  checkinOfficerUids String[]            @default([])
   eventAdminUid      String?
-  Tenant             Tenant      @relation(fields: [tenantId], references: [id])
-  venue              Venue?      @relation(fields: [venueId], references: [id])
+  bulk_tickets       bulk_tickets[]
+  cart_items         cart_items[]
+  Tenant             Tenant              @relation(fields: [tenantId], references: [id])
+  venue              Venue?              @relation(fields: [venueId], references: [id])
+  seat_reservations  seat_reservations[]
+  user_tickets       user_tickets[]
+}
+
+model bulk_tickets {
+  id             Int            @id @default(autoincrement())
+  eventId        Int
+  venueId        Int
+  seatType       SeatType
+  price          Float
+  totalSeats     Int
+  availableSeats Int
+  seatPrefix     String
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime
+  events         events         @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  Venue          Venue          @relation(fields: [venueId], references: [id], onDelete: Cascade)
+  cart_items     cart_items[]
+  user_tickets   user_tickets[]
+}
+
+model bulkticket {
+  external_event_id Int
+  external_venue_id Int
+  seat_type         seattype
+  price             Float
+  total_seats       Int
+  available_seats   Int
+  seat_prefix       String       @db.VarChar
+  id                Int          @id @default(autoincrement())
+  created_at        DateTime     @db.Timestamp(6)
+  updated_at        DateTime?    @db.Timestamp(6)
+  cartitem          cartitem[]
+  userticket        userticket[]
+}
+
+model cart_items {
+  id               Int           @id @default(autoincrement())
+  firebaseUid      String
+  bulkTicketId     Int?
+  preferredSeatIds String?
+  quantity         Int           @default(1)
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime
+  eventId          Int?
+  price            Float?
+  seatId           String?
+  seatInfo         String?
+  seatType         SeatType?
+  bulk_tickets     bulk_tickets? @relation(fields: [bulkTicketId], references: [id], onDelete: Cascade)
+  events           events?       @relation(fields: [eventId], references: [id], onDelete: Cascade)
+}
+
+model cartitem {
+  firebase_uid       String     @db.VarChar
+  bulk_ticket_id     Int
+  preferred_seat_ids String     @db.VarChar
+  quantity           Int
+  id                 Int        @id @default(autoincrement())
+  created_at         DateTime   @db.Timestamp(6)
+  updated_at         DateTime?  @db.Timestamp(6)
+  bulkticket         bulkticket @relation(fields: [bulk_ticket_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+model seat_reservations {
+  id          Int               @id @default(autoincrement())
+  eventId     Int
+  seatId      String
+  firebaseUid String
+  status      ReservationStatus @default(RESERVED)
+  expiresAt   DateTime
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime
+  orderId     Int?
+  events      events            @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  user_orders user_orders?      @relation(fields: [orderId], references: [id])
+
+  @@unique([eventId, seatId])
+}
+
+model seatreservation {
+  external_event_id Int
+  seat_id           String            @db.VarChar
+  firebase_uid      String            @db.VarChar
+  status            reservationstatus
+  expires_at        DateTime          @db.Timestamp(6)
+  order_id          Int?
+  id                Int               @id @default(autoincrement())
+  created_at        DateTime          @db.Timestamp(6)
+  updated_at        DateTime?         @db.Timestamp(6)
+  userorder         userorder?        @relation(fields: [order_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([seat_id], map: "ix_seatreservation_seat_id")
+}
+
+model transaction {
+  order_id              Int
+  amount                Float
+  payment_method        String            @db.VarChar
+  transaction_reference String?           @db.VarChar
+  status                transactionstatus
+  id                    Int               @id @default(autoincrement())
+  transaction_id        String            @unique(map: "ix_transaction_transaction_id") @db.VarChar
+  created_at            DateTime          @db.Timestamp(6)
+  updated_at            DateTime?         @db.Timestamp(6)
+  userorder             userorder         @relation(fields: [order_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+model transactions {
+  id                   Int               @id @default(autoincrement())
+  orderId              Int
+  transactionId        String            @unique
+  amount               Float
+  paymentMethod        String
+  transactionReference String?
+  status               TransactionStatus @default(PENDING)
+  createdAt            DateTime          @default(now())
+  updatedAt            DateTime
+  user_orders          user_orders       @relation(fields: [orderId], references: [id], onDelete: Cascade)
+}
+
+model user_orders {
+  id                Int                 @id @default(autoincrement())
+  firebaseUid       String
+  orderReference    String              @unique
+  paymentIntentId   String?             @unique
+  stripePaymentId   String?
+  totalAmount       Float
+  serviceFee        Float               @default(0.0)
+  status            OrderStatus         @default(PENDING)
+  notes             String?
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime
+  completedAt       DateTime?
+  seat_reservations seat_reservations[]
+  transactions      transactions[]
+  user_tickets      user_tickets[]
+}
+
+model user_tickets {
+  id           Int           @id @default(autoincrement())
+  orderId      Int
+  bulkTicketId Int?
+  firebaseUid  String
+  seatId       String
+  pricePaid    Float
+  status       TicketStatus  @default(SOLD)
+  qrCodeData   String        @default("")
+  createdAt    DateTime      @default(now())
+  eventId      Int?
+  bulk_tickets bulk_tickets? @relation(fields: [bulkTicketId], references: [id], onDelete: Cascade)
+  events       events?       @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  user_orders  user_orders   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+}
+
+model userorder {
+  firebase_uid      String            @db.VarChar
+  total_amount      Float
+  status            orderstatus
+  notes             String?           @db.VarChar
+  id                Int               @id @default(autoincrement())
+  order_reference   String            @unique(map: "ix_userorder_order_reference") @db.VarChar
+  payment_intent_id String?           @unique @db.VarChar
+  stripe_payment_id String?           @db.VarChar
+  service_fee       Float
+  created_at        DateTime          @db.Timestamp(6)
+  updated_at        DateTime?         @db.Timestamp(6)
+  completed_at      DateTime?         @db.Timestamp(6)
+  seatreservation   seatreservation[]
+  transaction       transaction[]
+  userticket        userticket[]
+}
+
+model userticket {
+  order_id       Int
+  bulk_ticket_id Int
+  firebase_uid   String       @db.VarChar
+  seat_id        String       @db.VarChar
+  price_paid     Float
+  status         ticketstatus
+  id             Int          @id @default(autoincrement())
+  qr_code_data   String       @db.VarChar
+  created_at     DateTime     @db.Timestamp(6)
+  bulkticket     bulkticket   @relation(fields: [bulk_ticket_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  userorder      userorder    @relation(fields: [order_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([qr_code_data], map: "ix_userticket_qr_code_data")
+  @@index([seat_id], map: "ix_userticket_seat_id")
 }
 
 enum EventStatus {
@@ -72,4 +274,71 @@ enum Category {
   FESTIVAL
   WORKSHOP
   OTHER
+}
+
+enum OrderStatus {
+  PENDING
+  CONFIRMED
+  CANCELLED
+  COMPLETED
+}
+
+enum ReservationStatus {
+  RESERVED
+  CONFIRMED
+  EXPIRED
+  CANCELLED
+  SOLD
+}
+
+enum SeatType {
+  VIP
+  REGULAR
+}
+
+enum TicketStatus {
+  AVAILABLE
+  RESERVED
+  SOLD
+  CANCELLED
+}
+
+enum TransactionStatus {
+  PENDING
+  SUCCESS
+  FAILED
+  REFUNDED
+}
+
+enum orderstatus {
+  PENDING
+  CONFIRMED
+  CANCELLED
+  COMPLETED
+}
+
+enum reservationstatus {
+  RESERVED
+  CONFIRMED
+  CANCELLED
+  EXPIRED
+}
+
+enum seattype {
+  VIP
+  REGULAR
+}
+
+enum ticketstatus {
+  AVAILABLE
+  RESERVED
+  SOLD
+  CANCELLED
+}
+
+enum transactionstatus {
+  PENDING
+  SUCCESS
+  FAILED
+  REFUNDED
 }
