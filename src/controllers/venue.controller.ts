@@ -56,10 +56,20 @@ export const addVenue = async (req: Request, res: Response) => {
     return res.status(403).json({ error: 'Only venue owners can add venues' });
   }
 
-  const { name, seatMap, location, capacity } = req.body;
+  const { name, seatMap, location, capacity, type } = req.body;
 
-  if (!name || !seatMap || !location || !capacity) {
+  if (!name || !seatMap || !location || !capacity || !type) {
     return res.status(400).json({ error: 'Missing required fields' });
+  }
+
+  // Validate venue type
+  const validVenueTypes = ['STADIUM_INDOOR', 'STADIUM_OUTDOOR', 'THEATRE', 'CONFERENCE_HALL', 'MUSIC_VENUE', 'MOVIE_THEATER', 'OPEN_AREA'];
+  if (!validVenueTypes.includes(type)) {
+    return res.status(400).json({ 
+      error: 'Invalid venue type',
+      allowedTypes: validVenueTypes,
+      received: type
+    });
   }
 
   try {
@@ -80,7 +90,8 @@ export const addVenue = async (req: Request, res: Response) => {
         capacity,
         seatMap,
         tenantId: tenant.id,
-        ownerUid: user.uid 
+        ownerUid: user.uid,
+        type
       }
     });
 
@@ -152,7 +163,19 @@ export const getVenueById = async (req: Request, res: Response) => {
 export const updateVenue = async (req: Request, res: Response) => {
   const { role, uid } = req.user;
   const venueId = parseInt(req.params.id);
-  const { name, seatMap, location, capacity } = req.body;
+  const { name, seatMap, location, capacity, type } = req.body;
+
+  // Validate venue type if provided
+  if (type !== undefined) {
+    const validVenueTypes = ['STADIUM_INDOOR', 'STADIUM_OUTDOOR', 'THEATRE', 'CONFERENCE_HALL', 'MUSIC_VENUE', 'MOVIE_THEATER', 'OPEN_AREA'];
+    if (!validVenueTypes.includes(type)) {
+      return res.status(400).json({ 
+        error: 'Invalid venue type',
+        allowedTypes: validVenueTypes,
+        received: type
+      });
+    }
+  }
 
   try {
     const existing = await getPrisma().venue.findUnique({
@@ -172,7 +195,7 @@ export const updateVenue = async (req: Request, res: Response) => {
 
     const updated = await getPrisma().venue.update({
       where: { id: venueId },
-      data: { name, seatMap, location, capacity },
+      data: { name, seatMap, location, capacity, type },
     });
 
     res.status(200).json({
@@ -409,19 +432,45 @@ export const getMyVenues = async (req: Request, res: Response) => {
   }
 }
 
-// Temporary endpoint to set user roles - REMOVE IN PRODUCTION
-export const setRole = async (req: Request, res: Response) => {
-  const { uid, role } = req.body;
-  
-  if (!uid || !role) {
-    return res.status(400).json({ error: 'UID and role are required' });
-  }
-  
-  try {
-    const result = await setUserRole(uid, role);
-    return res.status(200).json(result);
-  } catch (error) {
-    console.error('Error setting role:', error);
-    return res.status(500).json({ error: 'Failed to set role' });
-  }
+// GET /venues/type/:type - Get venues by type
+export const getVenuesByType = async (req: Request, res: Response) => {
+    try {
+        const venueType = req.params.type;
+        
+        if (!venueType) {
+            return res.status(400).json({ error: 'Venue type is required' });
+        }
+
+        // Validate venue type
+        const validVenueTypes = ['STADIUM_INDOOR', 'STADIUM_OUTDOOR', 'THEATRE', 'CONFERENCE_HALL', 'MUSIC_VENUE', 'MOVIE_THEATER', 'OPEN_AREA'];
+        if (!validVenueTypes.includes(venueType)) {
+            return res.status(400).json({ 
+              error: 'Invalid venue type',
+              allowedTypes: validVenueTypes,
+              received: venueType
+            });
+        }
+
+        console.log('🔍 getVenuesByType called with type:', venueType);
+
+        const venues = await getPrisma().venue.findMany({
+            where: { 
+                type: venueType as any,
+                // Optionally, only approved or public venues
+            },
+            include: { tenant: true },
+            orderBy: {
+                name: 'asc'
+            }
+        });
+
+        console.log(`📊 Found ${venues.length} venues of type: ${venueType}`);
+        res.status(200).json({
+            data: venues,
+            message: `Venues of type ${venueType} fetched successfully`
+        });
+    } catch (error) {
+        console.error('Failed to fetch venues by type:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
 };
