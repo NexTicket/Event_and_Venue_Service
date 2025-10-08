@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { getAuth } from 'firebase-admin/auth';
 import { getFirestore } from 'firebase-admin/firestore';
+import { ensureTenantExists } from '../utils/autoCreateTenant';
 
 // Set Firebase custom claims for a user
 export const setUserClaims = async (req: Request, res: Response) => {
@@ -216,6 +217,107 @@ export const bootstrapAdmin = async (req: Request, res: Response) => {
 
     res.status(500).json({
       error: 'Failed to bootstrap admin',
+      details: error.message
+    });
+  }
+};
+
+// Fetch Firebase users by role for staff assignment
+export const fetchFirebaseUsers = async (req: Request, res: Response) => {
+  try {
+    const { role } = req.body;
+    const user = req.user;
+
+    // Only admins can fetch user lists
+    if (!user || user.role !== 'admin') {
+      return res.status(403).json({
+        error: 'Access denied. Only administrators can fetch user lists.'
+      });
+    }
+
+    console.log('👥 Fetching Firebase users with role filter:', role);
+
+    // Get all users from Firebase Auth (with pagination if needed)
+    const db = getFirestore();
+    const usersCollection = db.collection('users');
+    
+    // Filter by role if specified
+    let snapshot;
+    if (role) {
+      snapshot = await usersCollection.where('role', '==', role).get();
+    } else {
+      snapshot = await usersCollection.get();
+    }
+    const users: any[] = [];
+
+    snapshot.forEach(doc => {
+      const userData = doc.data();
+      users.push({
+        uid: userData.uid,
+        email: userData.email,
+        role: userData.role,
+        displayName: userData.displayName || userData.firstName + ' ' + userData.lastName || userData.email,
+        firstName: userData.firstName,
+        lastName: userData.lastName
+      });
+    });
+
+    console.log(`✅ Found ${users.length} users${role ? ` with role '${role}'` : ''}`);
+
+    res.status(200).json({
+      message: 'Users fetched successfully',
+      data: users,
+      count: users.length
+    });
+
+  } catch (error: any) {
+    console.error('❌ Error fetching Firebase users:', error);
+    res.status(500).json({
+      error: 'Failed to fetch users',
+      details: error.message
+    });
+  }
+};
+
+// Ensure user has a tenant record (for event admins, checkin officers, etc.)
+export const ensureUserTenant = async (req: Request, res: Response) => {
+  try {
+    const user = req.user;
+
+    if (!user) {
+      return res.status(401).json({
+        error: 'Authentication required'
+      });
+    }
+
+    console.log('🏢 Ensuring tenant exists for user:', { uid: user.uid, role: user.role, email: user.email });
+
+    // Auto-create tenant if user role requires it
+    const tenant = await ensureTenantExists(user);
+
+    if (tenant) {
+      res.status(200).json({
+        message: 'User tenant ensured successfully',
+        data: {
+          tenantId: tenant.id,
+          userRole: user.role,
+          tenantName: tenant.name
+        }
+      });
+    } else {
+      res.status(200).json({
+        message: 'User role does not require tenant',
+        data: {
+          userRole: user.role,
+          requiresTenant: false
+        }
+      });
+    }
+
+  } catch (error: any) {
+    console.error('❌ Error ensuring user tenant:', error);
+    res.status(500).json({
+      error: 'Failed to ensure user tenant',
       details: error.message
     });
   }
