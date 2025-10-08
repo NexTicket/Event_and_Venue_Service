@@ -25,11 +25,15 @@ model Venue {
   tenantId      Int
   capacity      Int?
   location      String?
+  type          String?
+  latitude      Float?
+  longitude     Float?
   image         String?
   ownerUid      String?
   description   String?
   featuredImage String?
   images        String[]
+  availability  Json?
   tenant        Tenant   @relation(fields: [tenantId], references: [id])
   events        events[]
 }

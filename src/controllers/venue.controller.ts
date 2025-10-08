@@ -1,7 +1,7 @@
 import { PrismaClient } from "../../generated/prisma/index.js";
 import {Request, Response} from 'express';
 import { setUserRole } from "../utils/userRoles";
-import { ensureTenantExists } from '../utils/autoCreateTenant.js';
+import { ensureTenantExists } from '../utils/autoCreateTenant';
 
 
 // Extend the Express Request interface
@@ -56,7 +56,7 @@ export const addVenue = async (req: Request, res: Response) => {
     return res.status(403).json({ error: 'Only venue owners can add venues' });
   }
 
-  const { name, seatMap, location, capacity, type } = req.body;
+  const { name, seatMap, location, capacity, type, latitude, longitude, description, contact, amenities, availability } = req.body;
 
   if (!name || !seatMap || !location || !capacity || !type) {
     return res.status(400).json({ error: 'Missing required fields' });
@@ -81,7 +81,11 @@ export const addVenue = async (req: Request, res: Response) => {
         seatMap,
         tenantId: tenant.id,
         ownerUid: user.uid,
-        type
+        type,
+        latitude: latitude ? parseFloat(latitude) : null,
+        longitude: longitude ? parseFloat(longitude) : null,
+        description: description || null,
+        availability: availability || null
       }
     });
 
@@ -153,7 +157,7 @@ export const getVenueById = async (req: Request, res: Response) => {
 export const updateVenue = async (req: Request, res: Response) => {
   const { role, uid } = req.user;
   const venueId = parseInt(req.params.id);
-  const { name, seatMap, location, capacity, type } = req.body;
+  const { name, seatMap, location, capacity, type, availability } = req.body;
 
   try {
     const existing = await getPrisma().venue.findUnique({
@@ -173,7 +177,7 @@ export const updateVenue = async (req: Request, res: Response) => {
 
     const updated = await getPrisma().venue.update({
       where: { id: venueId },
-      data: { name, seatMap, location, capacity, type },
+      data: { name, seatMap, location, capacity, type, availability },
     });
 
     res.status(200).json({
@@ -409,6 +413,66 @@ export const getMyVenues = async (req: Request, res: Response) => {
     res.status(500).json({ error: 'Internal server error' });
   }
 }
+
+// PUT /venues/updatevenue/:id - Update Venue
+export const updateVenue = async (req: Request, res: Response) => {
+  const user = req.user;
+  const venueId = parseInt(req.params.id);
+
+  console.log('👤 UpdateVenue - User:', user ? `${user.email} (${user.role})` : 'No user');
+  console.log('📍 Updating venue ID:', venueId);
+
+  if (!user || user.role !== 'venue_owner') {
+    return res.status(403).json({ error: 'Only venue owners can update venues' });
+  }
+
+  const { name, seatMap, location, capacity, type, latitude, longitude, description, contact, amenities, availability } = req.body;
+
+  try {
+    // Check if venue exists and user owns it
+    const existingVenue = await getPrisma().venue.findUnique({
+      where: { id: venueId },
+      include: { tenant: true },
+    });
+
+    if (!existingVenue) {
+      return res.status(404).json({ error: 'Venue not found' });
+    }
+
+    if (existingVenue.tenant?.firebaseUid !== user.uid) {
+      return res.status(403).json({ error: 'Not authorized to update this venue' });
+    }
+
+    // Update the venue
+    const updatedVenue = await getPrisma().venue.update({
+      where: { id: venueId },
+      data: {
+        ...(name && { name }),
+        ...(seatMap && { seatMap }),
+        ...(location && { location }),
+        ...(capacity && { capacity }),
+        ...(type && { type }),
+        ...(latitude !== undefined && { latitude: parseFloat(latitude) }),
+        ...(longitude !== undefined && { longitude: parseFloat(longitude) }),
+        ...(description !== undefined && { description }),
+        ...(contact && { contact }),
+        ...(amenities && { amenities }),
+        ...(availability && { availability })
+      },
+    });
+
+    console.log('✅ Venue updated successfully:', updatedVenue.id);
+
+    res.status(200).json({
+      data: updatedVenue,
+      message: 'Venue updated successfully',
+    });
+
+  } catch (error) {
+    console.error('Failed to update venue:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
 
 // GET /venues/type/:type - Get venues by type
 export const getVenuesByType = async (req: Request, res: Response) => {
