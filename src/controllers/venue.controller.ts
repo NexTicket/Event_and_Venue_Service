@@ -62,16 +62,6 @@ export const addVenue = async (req: Request, res: Response) => {
     return res.status(400).json({ error: 'Missing required fields' });
   }
 
-  // Validate venue type
-  const validVenueTypes = ['STADIUM_INDOOR', 'STADIUM_OUTDOOR', 'THEATRE', 'CONFERENCE_HALL', 'MUSIC_VENUE', 'MOVIE_THEATER', 'OPEN_AREA'];
-  if (!validVenueTypes.includes(type)) {
-    return res.status(400).json({ 
-      error: 'Invalid venue type',
-      allowedTypes: validVenueTypes,
-      received: type
-    });
-  }
-
   try {
     // Ensure user has a tenant record
     const tenant = await ensureTenantExists(user);
@@ -164,18 +154,6 @@ export const updateVenue = async (req: Request, res: Response) => {
   const { role, uid } = req.user;
   const venueId = parseInt(req.params.id);
   const { name, seatMap, location, capacity, type } = req.body;
-
-  // Validate venue type if provided
-  if (type !== undefined) {
-    const validVenueTypes = ['STADIUM_INDOOR', 'STADIUM_OUTDOOR', 'THEATRE', 'CONFERENCE_HALL', 'MUSIC_VENUE', 'MOVIE_THEATER', 'OPEN_AREA'];
-    if (!validVenueTypes.includes(type)) {
-      return res.status(400).json({ 
-        error: 'Invalid venue type',
-        allowedTypes: validVenueTypes,
-        received: type
-      });
-    }
-  }
 
   try {
     const existing = await getPrisma().venue.findUnique({
@@ -441,21 +419,11 @@ export const getVenuesByType = async (req: Request, res: Response) => {
             return res.status(400).json({ error: 'Venue type is required' });
         }
 
-        // Validate venue type
-        const validVenueTypes = ['STADIUM_INDOOR', 'STADIUM_OUTDOOR', 'THEATRE', 'CONFERENCE_HALL', 'MUSIC_VENUE', 'MOVIE_THEATER', 'OPEN_AREA'];
-        if (!validVenueTypes.includes(venueType)) {
-            return res.status(400).json({ 
-              error: 'Invalid venue type',
-              allowedTypes: validVenueTypes,
-              received: venueType
-            });
-        }
-
         console.log('🔍 getVenuesByType called with type:', venueType);
 
         const venues = await getPrisma().venue.findMany({
             where: { 
-                type: venueType as any,
+                type: venueType,
                 // Optionally, only approved or public venues
             },
             include: { tenant: true },
