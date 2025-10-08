@@ -1,7 +1,7 @@
 import { PrismaClient } from "../../generated/prisma/index.js";
 import { Request,Response } from 'express';
 import cloudinary from '../utils/cloudinary';
-import { ensureTenantExists } from '../utils/autoCreateTenant.js';
+import { ensureTenantExists } from '../utils/autoCreateTenant';
 
 
 // Extend the Express Request interface - this allows us to attach user data to the request object

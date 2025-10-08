@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
 import { getAuth } from 'firebase-admin/auth';
 import { getFirestore } from 'firebase-admin/firestore';
-import { ensureTenantExists } from '../utils/autoCreateTenant.js';
+import { ensureTenantExists } from '../utils/autoCreateTenant';
 
 // Set Firebase custom claims for a user
 export const setUserClaims = async (req: Request, res: Response) => {
