@@ -504,3 +504,112 @@ export const getVenuesByType = async (req: Request, res: Response) => {
         res.status(500).json({ error: 'Internal server error' });
     }
 };
+
+// New function to filter venues by type, district, and amenities
+export const getFilteredVenues = async (req: Request, res: Response) => {
+    try {
+        const { type, district, amenities } = req.query;
+        
+        console.log('🔍 getFilteredVenues called with filters:', { type, district, amenities });
+
+        // Build where clause dynamically
+        const whereClause: any = {};
+
+        // Filter by venue type if provided
+        if (type && type !== 'all') {
+            whereClause.type = type;
+        }
+
+        // Filter by district if provided - extract district from location string
+        if (district && district !== 'all') {
+            // Sri Lankan districts mapping
+            const districtKeywords = {
+                'Colombo': ['colombo', 'colombo 01', 'colombo 02', 'colombo 03', 'colombo 04', 'colombo 05', 'colombo 06', 'colombo 07', 'colombo 08', 'colombo 09', 'colombo 10', 'colombo 11', 'colombo 12', 'colombo 13', 'colombo 14', 'colombo 15'],
+                'Gampaha': ['gampaha', 'negombo', 'ja-ela', 'katunayake', 'seeduwa', 'kiribathgoda', 'wadduwa', 'bandaragama'],
+                'Kalutara': ['kalutara', 'beruwala', 'panadura', 'horana', 'matugama', 'alutgama'],
+                'Kandy': ['kandy', 'peradeniya', 'gampola', 'nawalapitiya', 'kadugannawa'],
+                'Matale': ['matale', 'dambulla', 'sigiriya', 'galewela'],
+                'Nuwara Eliya': ['nuwara eliya', 'hatton', 'maskeliya', 'talawakelle'],
+                'Galle': ['galle', 'hikkaduwa', 'ambalangoda', 'elpitigala', 'baddegama'],
+                'Matara': ['matara', 'weligama', 'dickwella', 'hakmana'],
+                'Hambantota': ['hambantota', 'tangalle', 'beliatta', 'katuwana'],
+                'Jaffna': ['jaffna', 'chavakachcheri', 'karainagar', 'kopay', 'point pedro', 'chankanai'],
+                'Kilinochchi': ['kilinochchi', 'paranthan'],
+                'Mannar': ['mannar', 'pesalai'],
+                'Vavuniya': ['vavuniya', 'nedunkeni'],
+                'Mullaitivu': ['mullaitivu', 'puthukkudiyiruppu'],
+                'Batticaloa': ['batticaloa', 'eravur', 'valachchenai'],
+                'Ampara': ['ampara', 'akkaraipattu', 'kalmunai', 'sainthamaruthu'],
+                'Trincomalee': ['trincomalee', 'kinniya', 'muttur'],
+                'Kurunegala': ['kurunegala', 'kuliyapitiya', 'nikaweratiya', 'pannala'],
+                'Puttalam': ['puttalam', 'chilaw', 'nattandiya', 'marawila'],
+                'Anuradhapura': ['anuradhapura', 'kekirawa', 'medawachchiya', 'thalawa'],
+                'Polonnaruwa': ['polonnaruwa', 'kaduruwela', 'medirigiriya'],
+                'Badulla': ['badulla', 'bandarawela', 'haputale', 'welimada'],
+                'Moneragala': ['moneragala', 'bibile', 'buttala', 'kataragama'],
+                'Ratnapura': ['ratnapura', 'balangoda', 'embilipitiya', 'kuruwita'],
+                'Kegalle': ['kegalle', 'mawanella', 'rambukkana', 'warakapola']
+            };
+
+            const selectedDistrict = district as string;
+            const keywords = districtKeywords[selectedDistrict as keyof typeof districtKeywords] || [];
+            
+            if (keywords.length > 0) {
+                whereClause.location = {
+                    contains: keywords[0], // Simple contains check for the first keyword
+                    mode: 'insensitive'
+                };
+            }
+        }
+
+        // Filter by amenities if provided
+        if (amenities) {
+            const amenitiesArray = Array.isArray(amenities) ? amenities : [amenities];
+            // Check if venue has any of the specified amenities
+            whereClause.amenities = {
+                not: null
+            };
+        }
+
+        const venues = await getPrisma().venue.findMany({
+            where: whereClause,
+            include: { tenant: true },
+            orderBy: {
+                name: 'asc'
+            }
+        });
+
+        // If amenities filter is specified, filter in JavaScript since amenities is JSON
+        let filteredVenues = venues;
+        if (amenities) {
+            const amenitiesArray = Array.isArray(amenities) ? amenities : [amenities];
+            filteredVenues = venues.filter(venue => {
+                if (!venue.amenities) return false;
+                
+                const venueAmenities = Array.isArray(venue.amenities) 
+                    ? venue.amenities 
+                    : typeof venue.amenities === 'object' 
+                        ? Object.values(venue.amenities).flat() 
+                        : [];
+                
+                return amenitiesArray.some(amenity => {
+                    const amenityStr = String(amenity).toLowerCase();
+                    return venueAmenities.some((va: any) => {
+                        if (!va) return false;
+                        const vaStr = String(va).toLowerCase();
+                        return vaStr.includes(amenityStr);
+                    });
+                });
+            });
+        }
+
+        console.log(`📊 Found ${filteredVenues.length} venues matching filters:`, { type, district, amenities });
+        res.status(200).json({
+            data: filteredVenues,
+            message: `Filtered venues fetched successfully`
+        });
+    } catch (error) {
+        console.error('Failed to fetch filtered venues:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+};
