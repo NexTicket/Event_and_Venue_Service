@@ -47,7 +47,7 @@ app.use('/api', tenantRoutes);  // tenant management routes
 app.use('/api', eventRoutes);
 
 /* ───────────── server ───────────── */
-const PORT = process.env.PORT || 4000;
+const PORT = process.env.PORT || 8000;
 
 export default app;
 

@@ -84,13 +84,13 @@ export const addVenue = async (req: Request, res: Response) => {
   const user = req.user;
   console.log('User from venue controller code:', user);
 
-  if (!user || user.role !== 'venue_owner') {
-    return res.status(403).json({ error: 'Only venue owners can add venues' });
+  if (!user || (user.role !== 'venue_owner' && user.role !== 'organizer')) {
+    return res.status(403).json({ error: 'Only venue owners and organizers can add venues' });
   }
 
-  const { name, seatMap, location, capacity } = req.body;
+  const { name, seatMap, location, capacity, type, latitude, longitude, description, contact, amenities, availability } = req.body;
 
-  if (!name || !seatMap || !location || !capacity) {
+  if (!name || !seatMap || !location || !capacity || !type) {
     return res.status(400).json({ error: 'Missing required fields' });
   }
 
@@ -114,7 +114,13 @@ export const addVenue = async (req: Request, res: Response) => {
         capacity,
         seatMap,
         tenantId: tenant.id,
-        ownerUid: user.uid 
+        ownerUid: user.uid,
+        type,
+        latitude: latitude ? parseFloat(latitude) : null,
+        longitude: longitude ? parseFloat(longitude) : null,
+        description: description || null,
+        availability: availability || null,
+        amenities: amenities || null
       }
     });
 
@@ -178,43 +184,6 @@ export const getVenueById = async (req: Request, res: Response) => {
     }
   } catch (error) {
     console.error('Failed to fetch venue:', error);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-};
-
-
-export const updateVenue = async (req: Request, res: Response) => {
-  const { role, uid } = req.user;
-  const venueId = parseInt(req.params.id);
-  const { name, seatMap, location, capacity } = req.body;
-
-  try {
-    const existing = await getPrisma().venue.findUnique({
-      where: { id: venueId },
-      include: { tenant: true },
-    });
-
-    if (!existing) {
-      return res.status(404).json({ error: "Venue not found" });
-    }
-
-    if (role === 'venue_owner' && 
-      existing.tenant?.firebaseUid !== uid
-    ) {
-      return res.status(403).json({ error: "You are not authorized to update this venue" });
-    }
-
-    const updated = await getPrisma().venue.update({
-      where: { id: venueId },
-      data: { name, seatMap, location, capacity },
-    });
-
-    res.status(200).json({
-      data: updated,
-      message: "Venue updated successfully",
-    });
-  } catch (error) {
-    console.error('Failed to update venue:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 };
@@ -328,10 +297,10 @@ export const uploadVenueImage = async (req: Request, res: Response) => {
   console.log(`📸 Single image upload request for venue ID ${venueId}`);
   console.log(`👤 User: ${user?.uid} (${user?.role})`);
 
-  // 🛡️ Role check (only venue_owner or admin can upload)
-  if (!user || (user.role !== 'venue_owner' && user.role !== 'admin')) {
-    console.log(`❌ Access denied: User role is ${user?.role}, expected venue_owner or admin`);
-    return res.status(403).json({ error: 'Only venue owners or admins can upload images' });
+  // 🛡️ Role check (only venue_owner, organizer or admin can upload)
+  if (!user || (user.role !== 'venue_owner' && user.role !== 'organizer' && user.role !== 'admin')) {
+    console.log(`❌ Access denied: User role is ${user?.role}, expected venue_owner, organizer or admin`);
+    return res.status(403).json({ error: 'Only venue owners, organizers or admins can upload images' });
   }
 
   // Check content type
@@ -422,8 +391,8 @@ export const getMyVenues = async (req: Request, res: Response) => {
   const user = req.user;
   console.log('User:', user);
 
-  if (!user || user.role !== 'venue_owner') {
-    return res.status(403).json({ error: 'Only venue owners can view their venues' });
+  if (!user || (user.role !== 'venue_owner' && user.role !== 'organizer')) {
+    return res.status(403).json({ error: 'Only venue owners and organizers can view their venues' });
   }
 
   try {
@@ -443,19 +412,95 @@ export const getMyVenues = async (req: Request, res: Response) => {
   }
 }
 
-// Temporary endpoint to set user roles - REMOVE IN PRODUCTION
-export const setRole = async (req: Request, res: Response) => {
-  const { uid, role } = req.body;
-  
-  if (!uid || !role) {
-    return res.status(400).json({ error: 'UID and role are required' });
+// PUT /venues/updatevenue/:id - Update Venue
+export const updateVenue = async (req: Request, res: Response) => {
+  const user = req.user;
+  const venueId = parseInt(req.params.id);
+
+  console.log('👤 UpdateVenue - User:', user ? `${user.email} (${user.role})` : 'No user');
+  console.log('📍 Updating venue ID:', venueId);
+
+  if (!user || (user.role !== 'venue_owner' && user.role !== 'organizer')) {
+    return res.status(403).json({ error: 'Only venue owners and organizers can update venues' });
   }
-  
+
+  const { name, seatMap, location, capacity, type, latitude, longitude, description, contact, amenities, availability } = req.body;
+
   try {
-    const result = await setUserRole(uid, role);
-    return res.status(200).json(result);
+    // Check if venue exists and user owns it
+    const existingVenue = await getPrisma().venue.findUnique({
+      where: { id: venueId },
+      include: { tenant: true },
+    });
+
+    if (!existingVenue) {
+      return res.status(404).json({ error: 'Venue not found' });
+    }
+
+    if (existingVenue.tenant?.firebaseUid !== user.uid) {
+      return res.status(403).json({ error: 'Not authorized to update this venue' });
+    }
+
+    // Update the venue
+    const updatedVenue = await getPrisma().venue.update({
+      where: { id: venueId },
+      data: {
+        ...(name && { name }),
+        ...(seatMap && { seatMap }),
+        ...(location && { location }),
+        ...(capacity && { capacity }),
+        ...(type && { type }),
+        ...(latitude !== undefined && { latitude: parseFloat(latitude) }),
+        ...(longitude !== undefined && { longitude: parseFloat(longitude) }),
+        ...(description !== undefined && { description }),
+        ...(contact && { contact }),
+        ...(amenities && { amenities }),
+        ...(availability && { availability })
+      },
+    });
+
+    console.log('✅ Venue updated successfully:', updatedVenue.id);
+
+    res.status(200).json({
+      data: updatedVenue,
+      message: 'Venue updated successfully',
+    });
+
   } catch (error) {
-    console.error('Error setting role:', error);
-    return res.status(500).json({ error: 'Failed to set role' });
+    console.error('Failed to update venue:', error);
+    res.status(500).json({ error: 'Internal server error' });
   }
+};
+
+// GET /venues/type/:type - Get venues by type
+export const getVenuesByType = async (req: Request, res: Response) => {
+    try {
+        const venueType = req.params.type;
+        
+        if (!venueType) {
+            return res.status(400).json({ error: 'Venue type is required' });
+        }
+
+        console.log('🔍 getVenuesByType called with type:', venueType);
+
+        const venues = await getPrisma().venue.findMany({
+            where: { 
+                type: venueType,
+                // Optionally, only approved or public venues
+            },
+            include: { tenant: true },
+            orderBy: {
+                name: 'asc'
+            }
+        });
+
+        console.log(`📊 Found ${venues.length} venues of type: ${venueType}`);
+        res.status(200).json({
+            data: venues,
+            message: `Venues of type ${venueType} fetched successfully`
+        });
+    } catch (error) {
+        console.error('Failed to fetch venues by type:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
 };
