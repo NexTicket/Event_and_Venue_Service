@@ -34,6 +34,8 @@ const venueData = [
     name: "Savoy Cinema - Premium Hall",
     location: "Wellawatte, Colombo 06",
     capacity: 180,
+    type: "MOVIE_THEATER",
+    amenities: ["WiFi", "Air Conditioning", "Sound System", "Wheelchair Accessible"],
     seatMap: {
       rows: 12,
       columns: 15,
@@ -51,6 +53,8 @@ const venueData = [
     name: "Savoy Cinema - IMAX Theater",
     location: "Wellawatte, Colombo 06",
     capacity: 250,
+    type: "MOVIE_THEATER",
+    amenities: ["WiFi", "Air Conditioning", "IMAX", "Dolby Atmos", "Reclining Seats", "Wheelchair Accessible"],
     seatMap: {
       rows: 15,
       columns: 18,
@@ -69,6 +73,8 @@ const venueData = [
     name: "Savoy Cinema - Hall C",
     location: "Wellawatte, Colombo 06",
     capacity: 120,
+    type: "MOVIE_THEATER",
+    amenities: ["WiFi", "Air Conditioning", "Sound System", "Wheelchair Accessible"],
     seatMap: {
       rows: 10,
       columns: 12,
@@ -86,6 +92,8 @@ const venueData = [
     name: "Colombo City Center - Grand Auditorium",
     location: "Slave Island, Colombo 02",
     capacity: 500,
+    type: "THEATRE",
+    amenities: ["WiFi", "Air Conditioning", "Orchestra Pit", "Stage Lighting", "Sound System", "Wheelchair Accessible", "Parking"],
     seatMap: {
       rows: 25,
       columns: 20,
@@ -124,6 +132,8 @@ const venueData = [
     name: "Liberty Plaza - Exhibition Hall",
     location: "Kollupitiya, Colombo 03",
     capacity: 300,
+    type: "CONFERENCE_HALL",
+    amenities: ["WiFi", "Air Conditioning", "Projection Screen", "Sound System", "Parking", "Wheelchair Accessible", "Catering"],
     seatMap: {
       rows: 15,
       columns: 20,
@@ -140,6 +150,8 @@ const venueData = [
     name: "Liberty Plaza - Rooftop Venue",
     location: "Kollupitiya, Colombo 03",
     capacity: 150,
+    type: "OPEN_AREA",
+    amenities: ["WiFi", "Open Air", "City View", "Bar Service", "Parking", "Wheelchair Accessible"],
     seatMap: {
       rows: 10,
       columns: 15,
@@ -298,6 +310,8 @@ async function main() {
             location: venue.location,
             capacity: venue.capacity,
             seatMap: venue.seatMap,
+            type: venue.type,
+            amenities: venue.amenities,
             tenantId: tenantId
           }
         });
