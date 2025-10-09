@@ -8,14 +8,13 @@
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
     "outDir": "./dist",
-    "rootDir": "./",
+    "rootDir": "./src",
     "moduleResolution": "node",
-    "allowImportingTsExtensions": true,
     "resolveJsonModule": true,
     "declaration": true,
     "declarationMap": true,
     "sourceMap": true,
-    "noEmit": true,
+    "noEmit": false,
     "types": ["node", "jest"]
   },
   "ts-node": {
@@ -23,13 +22,8 @@
     "experimentalSpecifierResolution": "node"
   },
   "include": [
-    "prisma/**/*.ts",
     "src/**/*.ts",
-    "tests/**/*.ts",
-    "*.ts",
-    "src",
-    "prisma/seed.mts",
-    "jest.config.mjs"
+    "src/**/*.mts"
   ],
   "exclude": [
     "node_modules",

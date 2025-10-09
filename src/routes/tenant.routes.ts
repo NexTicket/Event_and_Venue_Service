@@ -1,33 +1,41 @@
-import express from "express";
-import { createTenant, getTenantByFirebaseUid, updateTenant, getAllTenants } from "../controllers/tenant.controller";
-import { verifyToken } from "../middlewares/verifyToken";
+import express from 'express';
+import {
+  createTenant,
+  getTenantByFirebaseUid,
+  getTenantById,
+  getAllTenants,
+  updateTenant,
+  deleteTenant,
+  ensureTenantExists
+} from '../controllers/tenant.controller';
+import { verifyToken } from '../middlewares/verifyToken';
 
 const router = express.Router();
 
-// Test route without authentication
+// Health check route
 router.get('/tenants/health', (req, res) => {
   res.json({ status: 'Tenant routes working!', timestamp: new Date().toISOString() });
 });
 
-// Test route with simple auth bypass for testing
-router.post('/tenants/test', (req, res) => {
-  res.json({ 
-    message: 'Tenant POST endpoint working!', 
-    body: req.body,
-    timestamp: new Date().toISOString() 
-  });
-});
+// Ensure tenant exists (used by User-Service) - no auth required for service-to-service
+router.post('/tenants/ensure', ensureTenantExists);
 
-// Create a new tenant (when admin approves role request)
-router.post('/tenants', verifyToken, createTenant);
+// Get tenant by Firebase UID (used by User-Service) - no auth required for service-to-service
+router.get('/tenants/firebase/:firebaseUid', getTenantByFirebaseUid);
 
-// Get tenant by Firebase UID
-router.get('/tenants/firebase/:firebaseUid', verifyToken, getTenantByFirebaseUid);
+// Create a new tenant
+router.post('/tenants', createTenant);
 
-// Update tenant information
-router.put('/tenants/:id', verifyToken, updateTenant);
+// Get tenant by ID
+router.get('/tenants/:id', getTenantById);
 
 // Get all tenants (admin only)
-router.get('/tenants', verifyToken, getAllTenants);
+router.get('/tenants', getAllTenants);
+
+// Update tenant
+router.put('/tenants/:id', updateTenant);
+
+// Delete tenant (admin only - be careful)
+router.delete('/tenants/:id', verifyToken, deleteTenant);
 
 export default router;
