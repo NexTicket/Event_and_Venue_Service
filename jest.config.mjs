@@ -1,11 +1,27 @@
 export default {
   preset: 'ts-jest',
   testEnvironment: 'node',
-  setupFilesAfterEnv: ['<rootDir>/src/__tests__/setup.ts'],
-  roots: ['<rootDir>/tests', '<rootDir>/src'],
-  testMatch: ['**/tests/**/*.test.ts'],
+  extensionsToTreatAsEsm: ['.ts'],
+  transform: {
+    '^.+\\.ts$': ['ts-jest', {
+      useESM: true
+    }]
+  },
+  moduleNameMapper: {
+    '^(\\.{1,2}/.*)\\.js$': '$1',
+    '^firebase-admin/(.*)$': '<rootDir>/tests/__mocks__/firebase-admin/$1',
+    '^.*generated/prisma.*$': '<rootDir>/__mocks__/generated/prisma/index.js'
+  },
+  testMatch: [
+    '**/tests/**/*.test.ts',
+    '**/src/**/*.test.ts'
+  ],
   collectCoverageFrom: [
     'src/**/*.ts',
     '!src/**/*.d.ts',
+    '!src/generated/**'
   ],
+  setupFilesAfterEnv: ['<rootDir>/tests/setup-clean.ts'],
+  clearMocks: true,
+  resetMocks: true
 };
