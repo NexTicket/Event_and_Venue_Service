@@ -336,7 +336,7 @@ export const addEvent = async (req: Request, res: Response) => {
         return res.status(403).json({
             error: 'Only registered organizers can add events',
             userRole: user?.role,
-            allowedRoles: ['organizer', 'admin', 'customer']
+            allowedRoles: ['organizer']
         });
     }
     
@@ -483,9 +483,9 @@ export const getEventById = async (req: Request, res: Response) => {
                 data: event,
                 message: 'Event fetched successfully'
             });
-        }else {
+        } //{
             return res.status(403).json({ error: 'Not Authorized to view this event' });
-        }
+        //}
 
     }catch (error) {
         console.error('Failed to fetch event:',error);
