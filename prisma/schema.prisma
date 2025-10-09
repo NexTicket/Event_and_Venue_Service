@@ -35,6 +35,8 @@ model Venue {
   type          String?
   availability  Json?
   amenities     Json?
+  contactEmail  String?
+  contactPhone  String?
   tenant        Tenant   @relation(fields: [tenantId], references: [id])
   events        events[]
 }
