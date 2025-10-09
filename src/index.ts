@@ -4,9 +4,9 @@ import helmet from 'helmet';
 import morgan from 'morgan';
 import dotenv from 'dotenv';
 
-import venueRoutes  from './routes/venue.routes.js';
-import tenantRoutes from './routes/tenant.routes.js';
-import eventRoutes  from './routes/events.routes.js';
+import venueRoutes  from './routes/venue.routes';
+import tenantRoutes from './routes/tenant.routes';
+import eventRoutes  from './routes/events.routes';
 
 dotenv.config();
 

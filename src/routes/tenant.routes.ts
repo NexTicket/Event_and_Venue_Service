@@ -7,8 +7,8 @@ import {
   updateTenant,
   deleteTenant,
   ensureTenantExists
-} from '../controllers/tenant.controller.js';
-import { verifyToken } from '../middlewares/verifyToken.js';
+} from '../controllers/tenant.controller';
+import { verifyToken } from '../middlewares/verifyToken';
 
 const router = express.Router();
 
