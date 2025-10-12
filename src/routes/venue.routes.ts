@@ -1,5 +1,5 @@
 import  express  from "express";
-import { addVenue, deleteVenue, getAllVenues, getSeatMap, getVenueById, updateSeatMap, updateVenue, uploadVenueImage, getMyVenues, getVenuesByType, getFilteredVenues } from "../controllers/venue.controller";
+import { addVenue, deleteVenue, getAllVenues, getSeatMap, getVenueById, updateSeatMap, updateVenue, uploadVenueImage, getMyVenues, getVenuesByType, getFilteredVenues, getVenueAvailability } from "../controllers/venue.controller";
 import { verifyToken } from "../middlewares/verifyToken";
 import { optionalAuth } from "../middlewares/optionalAuth";
 import upload from "../middlewares/upload";
@@ -21,6 +21,7 @@ router.patch('/:id/seats', verifyToken, updateSeatMap);
 router.get('/venues/myvenues', verifyToken, getMyVenues);
 router.get('/venues/type/:type', optionalAuth, getVenuesByType);
 router.get('/venues/filter', optionalAuth, getFilteredVenues);
+router.get('/venues/:venueId/availability', optionalAuth, getVenueAvailability);
 
 router.post('/venues/:id/image', (req, res, next) => {
   console.log('🛣️ Image upload route hit:', req.params.id);
