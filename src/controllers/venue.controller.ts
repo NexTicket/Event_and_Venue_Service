@@ -505,12 +505,12 @@ export const getVenuesByType = async (req: Request, res: Response) => {
     }
 };
 
-// New function to filter venues by type, district, and amenities
+// New function to filter venues by type, location, and amenities
 export const getFilteredVenues = async (req: Request, res: Response) => {
     try {
-        const { type, district, amenities } = req.query;
+        const { type, latitude, longitude, radius = 10, amenities } = req.query; // radius in km, default 10km
         
-        console.log('🔍 getFilteredVenues called with filters:', { type, district, amenities });
+        console.log('🔍 getFilteredVenues called with filters:', { type, latitude, longitude, radius, amenities });
 
         // Build where clause dynamically
         const whereClause: any = {};
@@ -520,46 +520,28 @@ export const getFilteredVenues = async (req: Request, res: Response) => {
             whereClause.type = type;
         }
 
-        // Filter by district if provided - extract district from location string
-        if (district && district !== 'all') {
-            // Sri Lankan districts mapping
-            const districtKeywords = {
-                'Colombo': ['colombo', 'colombo 01', 'colombo 02', 'colombo 03', 'colombo 04', 'colombo 05', 'colombo 06', 'colombo 07', 'colombo 08', 'colombo 09', 'colombo 10', 'colombo 11', 'colombo 12', 'colombo 13', 'colombo 14', 'colombo 15'],
-                'Gampaha': ['gampaha', 'negombo', 'ja-ela', 'katunayake', 'seeduwa', 'kiribathgoda', 'wadduwa', 'bandaragama'],
-                'Kalutara': ['kalutara', 'beruwala', 'panadura', 'horana', 'matugama', 'alutgama'],
-                'Kandy': ['kandy', 'peradeniya', 'gampola', 'nawalapitiya', 'kadugannawa'],
-                'Matale': ['matale', 'dambulla', 'sigiriya', 'galewela'],
-                'Nuwara Eliya': ['nuwara eliya', 'hatton', 'maskeliya', 'talawakelle'],
-                'Galle': ['galle', 'hikkaduwa', 'ambalangoda', 'elpitigala', 'baddegama'],
-                'Matara': ['matara', 'weligama', 'dickwella', 'hakmana'],
-                'Hambantota': ['hambantota', 'tangalle', 'beliatta', 'katuwana'],
-                'Jaffna': ['jaffna', 'chavakachcheri', 'karainagar', 'kopay', 'point pedro', 'chankanai'],
-                'Kilinochchi': ['kilinochchi', 'paranthan'],
-                'Mannar': ['mannar', 'pesalai'],
-                'Vavuniya': ['vavuniya', 'nedunkeni'],
-                'Mullaitivu': ['mullaitivu', 'puthukkudiyiruppu'],
-                'Batticaloa': ['batticaloa', 'eravur', 'valachchenai'],
-                'Ampara': ['ampara', 'akkaraipattu', 'kalmunai', 'sainthamaruthu'],
-                'Trincomalee': ['trincomalee', 'kinniya', 'muttur'],
-                'Kurunegala': ['kurunegala', 'kuliyapitiya', 'nikaweratiya', 'pannala'],
-                'Puttalam': ['puttalam', 'chilaw', 'nattandiya', 'marawila'],
-                'Anuradhapura': ['anuradhapura', 'kekirawa', 'medawachchiya', 'thalawa'],
-                'Polonnaruwa': ['polonnaruwa', 'kaduruwela', 'medirigiriya'],
-                'Badulla': ['badulla', 'bandarawela', 'haputale', 'welimada'],
-                'Moneragala': ['moneragala', 'bibile', 'buttala', 'kataragama'],
-                'Ratnapura': ['ratnapura', 'balangoda', 'embilipitiya', 'kuruwita'],
-                'Kegalle': ['kegalle', 'mawanella', 'rambukkana', 'warakapola']
-            };
-
-            const selectedDistrict = district as string;
-            const keywords = districtKeywords[selectedDistrict as keyof typeof districtKeywords] || [];
+        // Filter by location if provided (latitude, longitude, radius)
+        if (latitude && longitude && radius) {
+            // Note: This assumes venues have latitude and longitude fields in the database
+            // For now, we'll use a simple location-based filtering if coordinates are available
+            // In a real implementation, you'd use PostGIS or similar for proper geospatial queries
+            const lat = parseFloat(latitude as string);
+            const lng = parseFloat(longitude as string);
+            const rad = parseFloat(radius as string);
             
-            if (keywords.length > 0) {
-                whereClause.location = {
-                    contains: keywords[0], // Simple contains check for the first keyword
-                    mode: 'insensitive'
-                };
-            }
+            // Simple bounding box approximation (not accurate for large distances)
+            // For proper geospatial queries, you'd need PostGIS or similar
+            const latDelta = (rad / 111.32); // Approximate degrees per km latitude
+            const lngDelta = (rad / (111.32 * Math.cos(lat * Math.PI / 180))); // Approximate degrees per km longitude
+            
+            whereClause.latitude = {
+                gte: lat - latDelta,
+                lte: lat + latDelta
+            };
+            whereClause.longitude = {
+                gte: lng - lngDelta,
+                lte: lng + lngDelta
+            };
         }
 
         // Filter by amenities if provided
@@ -603,13 +585,118 @@ export const getFilteredVenues = async (req: Request, res: Response) => {
             });
         }
 
-        console.log(`📊 Found ${filteredVenues.length} venues matching filters:`, { type, district, amenities });
+        console.log(`📊 Found ${filteredVenues.length} venues matching filters:`, { type, latitude, longitude, radius, amenities });
         res.status(200).json({
             data: filteredVenues,
             message: `Filtered venues fetched successfully`
         });
     } catch (error) {
         console.error('Failed to fetch filtered venues:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+};
+
+// New function to check venue availability for a specific date and time slot
+export const getVenueAvailability = async (req: Request, res: Response) => {
+    try {
+        const { venueId } = req.params;
+        const { date, startTime, endTime } = req.query;
+
+        if (!venueId || !date) {
+            return res.status(400).json({
+                error: 'venueId and date are required'
+            });
+        }
+
+        console.log('📅 getVenueAvailability called:', { venueId, date, startTime, endTime });
+
+        // Parse the date
+        const targetDate = new Date(date as string);
+        const nextDay = new Date(targetDate);
+        nextDay.setDate(nextDay.getDate() + 1);
+
+        // Build where clause for events on the specified date
+        const whereClause: any = {
+            venueId: parseInt(venueId as string),
+            startDate: {
+                gte: targetDate,
+                lt: nextDay
+            },
+            status: {
+                not: 'CANCELLED' // Exclude cancelled events
+            }
+        };
+
+        // Get all events for this venue on this date
+        const events = await getPrisma().events.findMany({
+            where: whereClause,
+            select: {
+                id: true,
+                title: true,
+                startTime: true,
+                endTime: true,
+                startDate: true,
+                endDate: true,
+                status: true
+            },
+            orderBy: {
+                startTime: 'asc'
+            }
+        });
+
+        console.log(`📊 Found ${events.length} events for venue ${venueId} on ${date}`);
+
+        // If checking for specific time slot
+        if (startTime && endTime) {
+            const hasConflict = events.some(event => {
+                if (!event.startTime || !event.endTime) return false;
+
+                const eventStart = new Date(`${date}T${event.startTime}`);
+                const eventEnd = new Date(`${date}T${event.endTime}`);
+                const requestedStart = new Date(`${date}T${startTime}`);
+                const requestedEnd = new Date(`${date}T${endTime}`);
+
+                // Check for overlap: event starts before requested ends AND event ends after requested starts
+                return eventStart < requestedEnd && eventEnd > requestedStart;
+            });
+
+            return res.status(200).json({
+                data: {
+                    venueId: parseInt(venueId as string),
+                    date,
+                    requestedTime: { startTime, endTime },
+                    isAvailable: !hasConflict,
+                    conflictingEvents: hasConflict ? events.filter(event => {
+                        if (!event.startTime || !event.endTime) return false;
+                        const eventStart = new Date(`${date}T${event.startTime}`);
+                        const eventEnd = new Date(`${date}T${event.endTime}`);
+                        const requestedStart = new Date(`${date}T${startTime}`);
+                        const requestedEnd = new Date(`${date}T${endTime}`);
+                        return eventStart < requestedEnd && eventEnd > requestedStart;
+                    }) : []
+                },
+                message: hasConflict ? 'Time slot is not available' : 'Time slot is available'
+            });
+        }
+
+        // Return all events for the day (for showing availability)
+        return res.status(200).json({
+            data: {
+                venueId: parseInt(venueId as string),
+                date,
+                events: events.map(event => ({
+                    id: event.id,
+                    title: event.title,
+                    startTime: event.startTime,
+                    endTime: event.endTime,
+                    status: event.status
+                }))
+            },
+            message: `Venue availability fetched successfully`
+        });
+
+    } catch (error) {
+        console.error('Failed to fetch venue availability:', error);
         res.status(500).json({ error: 'Internal server error' });
     }
 };
