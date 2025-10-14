@@ -503,7 +503,6 @@ export const updateEvent = async (req: Request, res: Response) => {
         endDate, 
         startTime, 
         endTime, 
-        capacity, 
         checkinOfficerUids 
     } = req.body;
 
@@ -517,9 +516,26 @@ export const updateEvent = async (req: Request, res: Response) => {
             return res.status(404).json({error: 'Event not found'});
         }
 
-        if((role === 'event_admin'|| role === 'organizer') && existing.Tenant?.firebaseUid !== uid){
-            return res.status(403).json({error: 'You are not authorized to update this event'})
+        // Authorization check
+        const isAdmin = role === 'admin';
+        const isOrganizer = role === 'organizer' && existing.Tenant?.firebaseUid === uid;
+        const isEventAdmin = role === 'event_admin' && existing.eventAdminUid === uid;
+        const isCheckinOfficer = role === 'checkin_officer' && existing.checkinOfficerUids?.includes(uid);
+
+        // Allow: admin (all events), organizer (their events), event_admin (assigned events)
+        // Checkin officers can only view, not edit
+        if (!isAdmin && !isOrganizer && !isEventAdmin) {
+            console.log('❌ Authorization failed:', { role, uid, eventAdminUid: existing.eventAdminUid, tenantFirebaseUid: existing.Tenant?.firebaseUid });
+            return res.status(403).json({
+                error: 'You are not authorized to update this event',
+                details: {
+                    yourRole: role,
+                    requiredRole: 'admin, organizer (owner), or event_admin (assigned)'
+                }
+            });
         }
+
+        console.log('✅ Authorization passed:', { role, uid, authorized: true });
 
         // Build update data object, only including fields that are provided
         const updateData: any = {};
@@ -529,7 +545,6 @@ export const updateEvent = async (req: Request, res: Response) => {
         if (endDate !== undefined) updateData.endDate = new Date(endDate);
         if (startTime !== undefined) updateData.startTime = startTime;
         if (endTime !== undefined) updateData.endTime = endTime;
-        if (capacity !== undefined) updateData.capacity = parseInt(capacity);
         if (checkinOfficerUids !== undefined) {
             // Clean and validate checkinOfficerUids
             const cleanUids = Array.isArray(checkinOfficerUids) 
@@ -573,9 +588,22 @@ export const deleteEvent = async ( req: Request , res: Response ) => {
             return res.status(404).json({error:'Event not found'})
         }
 
-        if(role==='organizer' && existing.Tenant?.firebaseUid !== uid ){
-            return res.status(403).json({error:'You are not authorized to delete the event'});
+        // Authorization check - only organizer (owner) and admin can delete
+        const isAdmin = role === 'admin';
+        const isOrganizer = role === 'organizer' && existing.Tenant?.firebaseUid === uid;
+
+        if (!isAdmin && !isOrganizer) {
+            console.log('❌ Delete authorization failed:', { role, uid, tenantFirebaseUid: existing.Tenant?.firebaseUid });
+            return res.status(403).json({
+                error: 'You are not authorized to delete this event',
+                details: {
+                    yourRole: role,
+                    requiredRole: 'admin or organizer (owner only)'
+                }
+            });
         }
+
+        console.log('✅ Delete authorization passed:', { role, uid, authorized: true });
 
         await getPrisma().events.delete({
             where : { id : eventId}

@@ -2,10 +2,6 @@ import request from 'supertest';
 import app from '../../src';
 
 describe('POST /api/events', () => {
-  beforeEach(() => {
-    jest.clearAllMocks();
-  });
-
   it('should create an event successfully', async () => {
     const token = 'organizer-token-123'; // Use organizer token
 

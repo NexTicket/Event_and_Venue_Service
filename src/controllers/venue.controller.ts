@@ -224,7 +224,6 @@ export const deleteVenue = async (req: Request, res: Response) => {
 // GET /venues/:id/seats - View Seat Map
 export const getSeatMap = async (req: Request, res: Response) => {
   const venueId = parseInt(req.params.id);
-  const { role } = req.user;
 
   try {
     const venue = await getPrisma().venue.findUnique({

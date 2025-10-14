@@ -16,8 +16,8 @@ router.post('/venues', verifyToken, addVenue);
 router.get('/venues/getvenuebyid/:id', optionalAuth, getVenueById);
 router.put('/venues/updatevenue/:id', verifyToken, updateVenue);
 router.delete('/venues/deletevenue/:id', verifyToken, deleteVenue);
-router.get('/:id/seats', verifyToken, getSeatMap);
-router.patch('/:id/seats', verifyToken, updateSeatMap);
+router.get('/venues/:id/seats', optionalAuth, getSeatMap); // Changed to optionalAuth for public viewing
+router.patch('/venues/:id/seats', verifyToken, updateSeatMap);
 router.get('/venues/myvenues', verifyToken, getMyVenues);
 router.get('/venues/type/:type', optionalAuth, getVenuesByType);
 router.get('/venues/filter', optionalAuth, getFilteredVenues);

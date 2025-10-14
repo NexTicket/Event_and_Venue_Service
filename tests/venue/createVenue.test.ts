@@ -12,6 +12,7 @@ describe('POST /api/venues', () => {
         name: 'Cinnamon Grand Hall',
         location: 'Colombo',
         capacity: 300,
+        type: 'Conference Hall', // Required field
         seatMap: {
           rows: 10,
           columns: 30,
