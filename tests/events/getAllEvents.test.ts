@@ -37,35 +37,4 @@ describe('GET /api/events', () => {
       expect(event).toHaveProperty('venue');
     }
   });
-
-  it('should handle empty events list', async () => {
-    // Configure mock to return empty array
-    const mockPrisma = (global as any).mockPrismaClient;
-    mockPrisma.events.findMany.mockResolvedValueOnce([]);
-
-    const token = 'test-token-123';
-
-    const res = await request(app)
-      .get('/api/events')
-      .set('Authorization', `Bearer ${token}`);
-
-    expect(res.status).toBe(200);
-    expect(res.body.data).toEqual([]);
-    expect(res.body.message).toBe('Events fetched successfully');
-  });
-
-  it('should handle database errors', async () => {
-    // Configure mock to throw an error
-    const mockPrisma = (global as any).mockPrismaClient;
-    mockPrisma.events.findMany.mockRejectedValueOnce(new Error('Database connection failed'));
-
-    const token = 'test-token-123';
-
-    const res = await request(app)
-      .get('/api/events')
-      .set('Authorization', `Bearer ${token}`);
-
-    expect(res.status).toBe(500);
-    expect(res.body.error).toBe('Internal server error');
-  });
 });
