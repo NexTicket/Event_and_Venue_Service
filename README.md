@@ -1,12 +1,11 @@
 # NexTicket – Event and Venue Service
 
-This is the backend service responsible for managing **Events and Venues** in the NexTicket multi-tenant event ticketing platform. It is built with:
+This is the backend service responsible for managing **Venues** in the NexTicket multi-tenant event ticketing platform. It is built with:
 
 * Node.js + TypeScript (ES Modules)
 * Express.js (modular structure)
 * PostgreSQL (hosted on Railway)
 * Prisma ORM (with seed + migration support)
-* Twilio SMS integration for notifications
 
 ---
 
@@ -17,13 +16,12 @@ src/
 ├── controllers/
 ├── routes/
 ├── services/
-│   └── sms.service.ts     ← SMS notification service
 ├── middlewares/
 ├── utils/
-└── index.ts              ← Main Express server file
+└── index.mts             ← Main Express server file
 prisma/
-└── schema.prisma         ← Prisma schema (Venue, Tenant, Events)
-.env                      ← Environment variables
+└── schema.prisma         ← Prisma schema (Venue, Tenant)
+.env                      ← Environment variables (DATABASE_URL)
 ```
 
 ---
@@ -80,41 +78,10 @@ npx prisma migrate dev --name init
 
 You should see:
 
-```bash
+```
 Running seed command "tsx prisma/seed.mts"
 ✅ Dummy data inserted!
 ```
-
----
-
-## 📱 SMS Configuration (Twilio)
-
-To enable SMS notifications when events are approved, configure Twilio in your `.env` file:
-
-```bash
-# Twilio Configuration for SMS Notifications
-TWILIO_ACCOUNT_SID=REDACTED
-TWILIO_AUTH_TOKEN=REDACTED
-TWILIO_PHONE_NUMBER=REDACTED
-
-# Optional: Use API Key authentication instead of Auth Token
-# TWILIO_API_KEY=REDACTED
-# TWILIO_API_SECRET=REDACTED
-```
-
-### Setting up Twilio
-
-1. Create a [Twilio account](https://www.twilio.com)
-2. Go to the Twilio Console Dashboard
-3. Find your **Account SID** and **Auth Token** in the Account Info section
-4. Purchase a phone number or use a trial number from Phone Numbers > Manage > Buy a number
-5. Add the configuration to your `.env` file
-
-**Authentication Options:**
-- **Auth Token** (recommended for development): Use Account SID + Auth Token
-- **API Keys** (recommended for production): Create API Key + Secret for enhanced security
-
-**Note:** SMS notifications are optional. If Twilio is not configured, the system will continue to work without SMS notifications.
 
 ---
 
@@ -142,11 +109,11 @@ npm run seed
 npm run dev
 ```
 
-> This will run `src/index.ts` using `tsx` with `nodemon`
+> This will run `src/index.mts` using `ts-node` with ESM loader + `nodemon`
 
 You should see:
 
-```bash
+```
 ✅ Server running on http://localhost:4000
 ```
 
