@@ -93,13 +93,13 @@ To enable SMS notifications when events are approved, configure Twilio in your `
 
 ```bash
 # Twilio Configuration for SMS Notifications
-TWILIO_ACCOUNT_SID=ACfc804c2e260dd484e0e0c83a75c74c01
-TWILIO_AUTH_TOKEN=77d9639b9bb2dce1796268103fbf7d19
-TWILIO_PHONE_NUMBER=+16286666735
+TWILIO_ACCOUNT_SID=REDACTED
+TWILIO_AUTH_TOKEN=REDACTED
+TWILIO_PHONE_NUMBER=REDACTED
 
 # Optional: Use API Key authentication instead of Auth Token
-# TWILIO_API_KEY=your_twilio_api_key_here
-# TWILIO_API_SECRET=your_twilio_api_secret_here
+# TWILIO_API_KEY=REDACTED
+# TWILIO_API_SECRET=REDACTED
 ```
 
 ### Setting up Twilio
