@@ -1,7 +1,15 @@
 import { Request, Response } from 'express';
-import { PrismaClient } from '../../generated/prisma/index';
+import { PrismaClient } from '@prisma/client';
 
-const prisma = new PrismaClient();
+// Lazy-load Prisma client
+let prisma: PrismaClient;
+
+function getPrisma() {
+  if (!prisma) {
+    prisma = new PrismaClient();
+  }
+  return prisma;
+}
 
 // Create a new tenant
 export const createTenant = async (req: Request, res: Response): Promise<Response> => {
@@ -16,7 +24,7 @@ export const createTenant = async (req: Request, res: Response): Promise<Respons
     }
 
     // Check if tenant with this firebaseUid already exists
-    const existingTenant = await prisma.tenant.findUnique({
+    const existingTenant = await getPrisma().tenant.findUnique({
       where: { firebaseUid }
     });
 
@@ -28,7 +36,7 @@ export const createTenant = async (req: Request, res: Response): Promise<Respons
     }
 
     // Create new tenant
-    const tenant = await prisma.tenant.create({
+    const tenant = await getPrisma().tenant.create({
       data: {
         name,
         firebaseUid
@@ -60,7 +68,7 @@ export const getTenantByFirebaseUid = async (req: Request, res: Response): Promi
       });
     }
 
-    const tenant = await prisma.tenant.findUnique({
+    const tenant = await getPrisma().tenant.findUnique({
       where: { firebaseUid },
       include: {
         venues: true,
@@ -100,7 +108,7 @@ export const getTenantById = async (req: Request, res: Response): Promise<Respon
       });
     }
 
-    const tenant = await prisma.tenant.findUnique({
+    const tenant = await getPrisma().tenant.findUnique({
       where: { id: tenantId },
       include: {
         venues: true,
@@ -131,7 +139,7 @@ export const getTenantById = async (req: Request, res: Response): Promise<Respon
 // Get all tenants (admin only)
 export const getAllTenants = async (req: Request, res: Response): Promise<Response> => {
   try {
-    const tenants = await prisma.tenant.findMany({
+    const tenants = await getPrisma().tenant.findMany({
       include: {
         venues: true,
         events: true
@@ -174,7 +182,7 @@ export const updateTenant = async (req: Request, res: Response): Promise<Respons
       });
     }
 
-    const tenant = await prisma.tenant.update({
+    const tenant = await getPrisma().tenant.update({
       where: { id: tenantId },
       data: { name },
       include: {
@@ -217,7 +225,7 @@ export const deleteTenant = async (req: Request, res: Response): Promise<Respons
     }
 
     // Check if tenant has associated venues or events
-    const tenant = await prisma.tenant.findUnique({
+    const tenant = await getPrisma().tenant.findUnique({
       where: { id: tenantId },
       include: {
         venues: true,
@@ -239,7 +247,7 @@ export const deleteTenant = async (req: Request, res: Response): Promise<Respons
       });
     }
 
-    await prisma.tenant.delete({
+    await getPrisma().tenant.delete({
       where: { id: tenantId }
     });
 
@@ -272,7 +280,7 @@ export const ensureTenantExists = async (req: Request, res: Response): Promise<R
     }
 
     // Try to find existing tenant
-    let tenant = await prisma.tenant.findUnique({
+    let tenant = await getPrisma().tenant.findUnique({
       where: { firebaseUid }
     });
 
@@ -284,7 +292,7 @@ export const ensureTenantExists = async (req: Request, res: Response): Promise<R
         });
       }
 
-      tenant = await prisma.tenant.create({
+      tenant = await getPrisma().tenant.create({
         data: {
           name,
           firebaseUid

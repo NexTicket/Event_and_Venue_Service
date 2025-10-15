@@ -1,6 +1,6 @@
-import { PrismaClient } from "../../generated/prisma/index";
+import { PrismaClient } from "@prisma/client";
 import {Request, Response} from 'express';
-import { setUserRole } from "../utils/userRoles";
+import { setUserRole } from "../utils/userRoles.js";
 // Removed: import { ensureTenantExists } from '../utils/autoCreateTenant.js';
 // Now using User-Service API for tenant operations
 
@@ -564,7 +564,7 @@ export const getFilteredVenues = async (req: Request, res: Response) => {
         let filteredVenues = venues;
         if (amenities) {
             const amenitiesArray = Array.isArray(amenities) ? amenities : [amenities];
-            filteredVenues = venues.filter(venue => {
+            filteredVenues = venues.filter((venue: any) => {
                 if (!venue.amenities) return false;
                 
                 const venueAmenities = Array.isArray(venue.amenities) 
@@ -573,7 +573,7 @@ export const getFilteredVenues = async (req: Request, res: Response) => {
                         ? Object.values(venue.amenities).flat() 
                         : [];
                 
-                return amenitiesArray.some(amenity => {
+                return amenitiesArray.some((amenity: any) => {
                     const amenityStr = String(amenity).toLowerCase();
                     return venueAmenities.some((va: any) => {
                         if (!va) return false;
@@ -647,7 +647,7 @@ export const getVenueAvailability = async (req: Request, res: Response) => {
 
         // If checking for specific time slot
         if (startTime && endTime) {
-            const hasConflict = events.some(event => {
+            const hasConflict = events.some((event: any) => {
                 if (!event.startTime || !event.endTime) return false;
 
                 const eventStart = new Date(`${date}T${event.startTime}`);
@@ -665,7 +665,7 @@ export const getVenueAvailability = async (req: Request, res: Response) => {
                     date,
                     requestedTime: { startTime, endTime },
                     isAvailable: !hasConflict,
-                    conflictingEvents: hasConflict ? events.filter(event => {
+                    conflictingEvents: hasConflict ? events.filter((event: any) => {
                         if (!event.startTime || !event.endTime) return false;
                         const eventStart = new Date(`${date}T${event.startTime}`);
                         const eventEnd = new Date(`${date}T${event.endTime}`);
@@ -683,7 +683,7 @@ export const getVenueAvailability = async (req: Request, res: Response) => {
             data: {
                 venueId: parseInt(venueId as string),
                 date,
-                events: events.map(event => ({
+                events: events.map((event: any) => ({
                     id: event.id,
                     title: event.title,
                     startTime: event.startTime,

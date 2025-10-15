@@ -4,9 +4,9 @@ import helmet from 'helmet';
 import morgan from 'morgan';
 import dotenv from 'dotenv';
 
-import venueRoutes  from './routes/venue.routes';
-import tenantRoutes from './routes/tenant.routes';
-import eventRoutes  from './routes/events.routes';
+import venueRoutes  from './routes/venue.routes.js';
+import tenantRoutes from './routes/tenant.routes.js';
+import eventRoutes  from './routes/events.routes.js';
 
 dotenv.config();
 
@@ -41,6 +41,7 @@ app.use((req, res, next) => {
 
 /* ───────────── routes ───────────── */
 app.get('/', (_req, res) => res.send('EVMS API Running 🚀'));
+app.get('/health', (_req, res) => res.status(200).json({ status: 'ok', service: 'Event and Venue Service', timestamp: new Date().toISOString() }));
 
 app.use('/api', venueRoutes);   // includes /venues/:id/image
 app.use('/api', tenantRoutes);  // tenant management routes

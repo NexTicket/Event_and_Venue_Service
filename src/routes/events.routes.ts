@@ -12,10 +12,10 @@ import {
     getEventsByOrganizer,
     getEventsByEventAdmin,
     getEventsByCheckinOfficer
-} from '../controllers/event.controller';
-import { verifyToken } from '../middlewares/verifyToken';
-import { optionalAuth } from '../middlewares/optionalAuth';
-import upload from '../middlewares/upload';
+} from '../controllers/event.controller.js';
+import { verifyToken } from '../middlewares/verifyToken.js';
+import { optionalAuth } from '../middlewares/optionalAuth.js';
+import upload from '../middlewares/upload.js';
 
 const router = express.Router();
 

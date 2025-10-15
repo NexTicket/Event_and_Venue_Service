@@ -1,0 +1,64 @@
+# Ignore node_modules
+node_modules/
+
+# Ignore npm debug logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Ignore build output (will be generated in container)
+dist/
+build/
+
+# Ignore test files
+__tests__/
+*.test.ts
+*.test.js
+*.spec.ts
+*.spec.js
+test-*.ts
+test-*.js
+coverage/
+
+# Ignore development files
+.env.local
+.env.development
+.env.test
+
+# Ignore Git
+.git/
+.gitignore
+.github/
+
+# Ignore IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+
+# Ignore documentation
+README.md
+*.md
+!prisma/README.md
+
+# Ignore generated files (will be regenerated)
+generated/
+
+# Ignore mock files
+__mocks__/
+
+# Ignore test utilities
+tests/
+jest.config.*
+tsconfig.test.json
+
+# Ignore scripts
+*.mjs
+!prisma/seed.mts
+check-db.mts
+debug-token.mts
+reset-db.mts
+setCustomClaims.mts
+cleanup-venues.mjs
+test-server.*

@@ -1,6 +1,6 @@
-import { PrismaClient } from "../../generated/prisma/index";
+import { PrismaClient } from "@prisma/client";
 import { Request,Response } from 'express';
-import cloudinary from '../utils/cloudinary';
+import cloudinary from '../utils/cloudinary.js';
 // Removed: import { ensureTenantExists } from '../utils/autoCreateTenant.js';
 // Now using User-Service API for tenant operations
 
@@ -277,7 +277,7 @@ export const getEventsByEventAdmin = async (req: Request, res: Response) => {
         console.log(`📊 Found ${events.length} events assigned to event admin: ${user.uid}`);
 
         // Transform the data to match frontend expectations (title -> name)
-        const transformedEvents = events.map(event => ({
+        const transformedEvents = events.map((event: any) => ({
             ...event,
             name: event.title, // Map title to name for frontend compatibility
             capacity: event.venue?.capacity || 0
@@ -350,7 +350,7 @@ export const getEventsByCheckinOfficer = async (req: Request, res: Response) => 
         console.log(`📊 Found ${events.length} events assigned to checkin officer: ${user.uid}`);
 
         // Transform the data to match frontend expectations (title -> name)
-        const transformedEvents = events.map(event => ({
+        const transformedEvents = events.map((event: any) => ({
             ...event,
             name: event.title, // Map title to name for frontend compatibility
             capacity: event.venue?.capacity || 0
