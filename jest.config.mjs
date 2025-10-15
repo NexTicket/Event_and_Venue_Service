@@ -21,7 +21,6 @@ export default {
     '!src/**/*.d.ts',
     '!src/generated/**'
   ],
-  setupFilesAfterEnv: ['<rootDir>/tests/setup-clean.ts'],
   clearMocks: true,
   resetMocks: true
 };

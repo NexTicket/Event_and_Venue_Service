@@ -24,7 +24,7 @@ router.get('/events/venue/:venueId', getEventsByVenueId); // New route for event
 router.get('/events/organizer/:organizerId', getEventsByOrganizer); // New route for events by organizer
 router.get('/events/my-assigned-events', verifyToken, getEventsByEventAdmin); // For event admins
 router.get('/events/my-checkin-events', verifyToken, getEventsByCheckinOfficer); // For checkin officers
-router.post('/events',verifyToken, addEvent);
+router.post('/events', verifyToken, addEvent); // Restore auth - user must be organizer
 router.put('/events/update-event/:id',verifyToken, updateEvent);
 router.delete('/events/delete-event/:id', verifyToken, deleteEvent);
 

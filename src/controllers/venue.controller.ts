@@ -120,7 +120,9 @@ export const addVenue = async (req: Request, res: Response) => {
         longitude: longitude ? parseFloat(longitude) : null,
         description: description || null,
         availability: availability || null,
-        amenities: amenities || null
+        amenities: amenities || null,
+        contactEmail: contact?.email || null,
+        contactPhone: contact?.phone || null
       }
     });
 
@@ -453,7 +455,8 @@ export const updateVenue = async (req: Request, res: Response) => {
         ...(latitude !== undefined && { latitude: parseFloat(latitude) }),
         ...(longitude !== undefined && { longitude: parseFloat(longitude) }),
         ...(description !== undefined && { description }),
-        ...(contact && { contact }),
+        ...(contact?.email !== undefined && { contactEmail: contact.email }),
+        ...(contact?.phone !== undefined && { contactPhone: contact.phone }),
         ...(amenities && { amenities }),
         ...(availability && { availability })
       },

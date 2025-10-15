@@ -1,6 +1,7 @@
 import { PrismaClient } from "../../generated/prisma/index";
 import { Request,Response } from 'express';
 import cloudinary from '../utils/cloudinary';
+import { smsService } from '../services/sms.service';
 // Removed: import { ensureTenantExists } from '../utils/autoCreateTenant.js';
 // Now using User-Service API for tenant operations
 
@@ -8,13 +9,21 @@ import cloudinary from '../utils/cloudinary';
 const ensureTenantViaUserService = async (user: any, authToken: string) => {
   try {
     const userServiceUrl = process.env.USER_SERVICE_URL || 'http://localhost:4001';
+    
+    // Add AbortController for timeout
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+    
     const response = await fetch(`${userServiceUrl}/api/users/ensure-tenant`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${authToken}`
-      }
+      },
+      signal: controller.signal
     });
+
+    clearTimeout(timeoutId);
 
     if (!response.ok) {
       console.error('Failed to ensure tenant via User-Service:', response.status, await response.text());
@@ -319,7 +328,7 @@ export const getEventsByCheckinOfficer = async (req: Request, res: Response) => 
 };
 
 export const addEvent = async (req: Request, res: Response) => {
-
+    console.log('🎫 AddEvent function called');
     const user = req.user;
     
     console.log('🎫 AddEvent - User details:', {
@@ -330,17 +339,26 @@ export const addEvent = async (req: Request, res: Response) => {
         name: user?.name
     });
     
-    // For development: Allow admin and customer roles in addition to organizer
-    if (!user || !['organizer', 'admin', 'customer'].includes(user.role)) {
-        console.log('❌ Authorization failed - invalid role:', user?.role);
+    // Only allow organizers to create events
+    if (!user || user.role !== 'organizer') {
+        console.log('❌ Authorization failed - user must be organizer:', user?.role);
         return res.status(403).json({
-            error: 'Only registered organizers can add events',
+            error: 'Only registered organizers can create events',
             userRole: user?.role,
             allowedRoles: ['organizer']
         });
     }
     
     const { title, description, category, type, startDate, endDate, startTime, endTime, venueId, image } = req.body;
+    
+    console.log('📝 Request body fields:', {
+        title: !!title,
+        description: !!description,
+        category: !!category,
+        type: !!type,
+        startDate: !!startDate,
+        bodySize: JSON.stringify(req.body).length
+    });
     
     
     if(!title || !description || !category || !type || !startDate) {
@@ -386,7 +404,20 @@ export const addEvent = async (req: Request, res: Response) => {
             });
         }
         
-        console.log('✅ Tenant found/created:', tenant.tenantId); 
+        console.log('✅ Tenant found/created:', JSON.stringify(tenant, null, 2)); 
+        
+        // Extract tenantId from the tenant object - it could be under different property names
+        const tenantId = tenant?.tenantId || tenant?.id || tenant?.tenant?.id;
+        
+        if (!tenantId) {
+            console.log('❌ No valid tenantId found in tenant object:', tenant);
+            return res.status(400).json({
+                error: 'Invalid tenant data - no tenantId found',
+                tenantData: tenant
+            });
+        }
+        
+        console.log('🔑 Using tenantId:', tenantId);
         
         // Parse dates properly - handle both date-only and full datetime strings
         const parseEventDate = (dateString: string) => {
@@ -411,7 +442,7 @@ export const addEvent = async (req: Request, res: Response) => {
                 endDate: eventEndDate,
                 startTime: startTime ?? null,
                 endTime: endTime ?? null,
-                tenantId: (tenant as any).tenantId || tenant.id,
+                tenantId: tenantId,
                 venueId: parsedVenueId,
                 image: image || null
             }
@@ -707,6 +738,15 @@ export const approveEvent = async (req: Request, res: Response) => {
         });
 
         console.log('✅ Event approved successfully:', updatedEvent.id);
+
+        // Notify venue owner via SMS using Twilio
+        if (updatedEvent.venue?.contactPhone) {
+            await smsService.sendEventApprovalNotification(
+                updatedEvent.venue.contactPhone,
+                updatedEvent.title,
+                updatedEvent.venue.name
+            );
+        }
 
         res.status(200).json({
             message: 'Event approved successfully',
