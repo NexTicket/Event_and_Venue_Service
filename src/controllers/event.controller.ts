@@ -8,6 +8,8 @@ import cloudinary from '../utils/cloudinary';
 const ensureTenantViaUserService = async (user: any, authToken: string) => {
   try {
     const userServiceUrl = process.env.USER_SERVICE_URL || 'http://localhost:4001';
+    console.log('📞 Calling User Service ensure-tenant for user:', user.uid);
+    
     const response = await fetch(`${userServiceUrl}/api/users/ensure-tenant`, {
       method: 'POST',
       headers: {
@@ -17,14 +19,32 @@ const ensureTenantViaUserService = async (user: any, authToken: string) => {
     });
 
     if (!response.ok) {
-      console.error('Failed to ensure tenant via User-Service:', response.status, await response.text());
+      const errorText = await response.text();
+      console.error('❌ User Service ensure-tenant failed:', response.status, errorText);
       return null;
     }
 
     const result = await response.json();
-    return result.data;
+    console.log('📦 User Service response:', JSON.stringify(result, null, 2));
+    
+    // Handle the User Service response structure
+    // Response is: { data: { tenantId, userRole, tenantName } }
+    if (result.data && result.data.tenantId) {
+      console.log('✅ Tenant ID extracted from User Service:', result.data.tenantId);
+      return { id: result.data.tenantId }; // Normalize to expected structure
+    }
+    
+    // Fallback: check if data itself is a tenant object
+    const tenant = result.data || result.tenant || result;
+    if (tenant && tenant.id) {
+      console.log('✅ Tenant found with id:', tenant.id);
+      return tenant;
+    }
+    
+    console.error('❌ Invalid tenant data received:', result);
+    return null;
   } catch (error) {
-    console.error('Error calling User-Service for tenant:', error);
+    console.error('❌ Error calling User-Service for tenant:', error);
     return null;
   }
 };
@@ -51,18 +71,47 @@ function getPrisma() {
 
 export const getAllEvents = async (req: Request , res: Response) => {
     try {
-        // Get status from query parameter, default to 'APPROVED' for public access
+        // Get status from query parameter
         const status = req.query.status as string;
+        const user = req.user;
+        const { role } = user || {};
         
-        // Build where clause based on status parameter
+        // Debug logging
+        console.log('🔍 getAllEvents - Request headers:', {
+            'x-user-id': req.headers['x-user-id'],
+            'x-user-email': req.headers['x-user-email'],
+            'x-user-role': req.headers['x-user-role']
+        });
+        console.log('🔍 getAllEvents - User object:', user);
+        console.log('🔍 getAllEvents - Extracted role:', role);
+        console.log('🔍 getAllEvents - Requested status:', status);
+        
+        // Build where clause based on status parameter and user role
         const whereClause: any = {};
+        
         if (status) {
+            // If status is explicitly requested
+            if (status.toUpperCase() === 'PENDING' && role !== 'admin') {
+                // Only admins can request PENDING events
+                console.log('❌ 403 Forbidden - role is not admin:', role);
+                return res.status(403).json({ 
+                    error: 'Not authorized to view pending events',
+                    debug: { role, status }
+                });
+            }
             whereClause.status = status.toUpperCase();
         } else {
-            whereClause.status = 'APPROVED'; // Default to approved events for public access
+            // No status specified - default behavior
+            if (role === 'admin') {
+                // Admins see all events by default
+                // Don't filter by status
+            } else {
+                // Public users and other roles see only APPROVED events
+                whereClause.status = 'APPROVED';
+            }
         }
 
-        console.log('🔍 getAllEvents called with status filter:', status || 'APPROVED (default)');
+        console.log('🔍 getAllEvents called by role:', role || 'public', 'status filter:', status || 'default');
 
         const events = await getPrisma().events.findMany({
             where: whereClause,
@@ -102,7 +151,7 @@ export const getAllEvents = async (req: Request , res: Response) => {
             }
         });
 
-        console.log(`📊 Found ${events.length} events with status: ${status || 'APPROVED'}`);
+        console.log(`📊 Found ${events.length} events for role: ${role || 'public'}`);
         res.status(200).json({
             data: events,
             message: "Events fetched successfully"
@@ -378,15 +427,17 @@ export const addEvent = async (req: Request, res: Response) => {
         const authToken = req.headers.authorization?.replace('Bearer ', '') || '';
         const tenant = await ensureTenantViaUserService(user, authToken);
         
-        if (!tenant) {
+        if (!tenant || !tenant.id) {
             console.log('❌ Failed to create/find tenant for user:', user.uid);
+            console.log('❌ Tenant data received:', tenant);
             return res.status(400).json({
                 error: 'Unable to create tenant for user',
-                userRole: user.role
+                userRole: user.role,
+                details: 'Tenant ID is missing or invalid'
             });
         }
         
-        console.log('✅ Tenant found/created:', tenant.tenantId); 
+        console.log('✅ Tenant found/created:', tenant.id); 
         
         // Parse dates properly - handle both date-only and full datetime strings
         const parseEventDate = (dateString: string) => {
@@ -411,7 +462,7 @@ export const addEvent = async (req: Request, res: Response) => {
                 endDate: eventEndDate,
                 startTime: startTime ?? null,
                 endTime: endTime ?? null,
-                tenantId: (tenant as any).tenantId || tenant.id,
+                tenantId: tenant.id,
                 venueId: parsedVenueId,
                 image: image || null
             }
@@ -478,17 +529,39 @@ export const getEventById = async (req: Request, res: Response) => {
         }
 
         // Authenticated access - apply original authorization logic
-        if(role === 'admin'|| role === 'customer' || role === 'venue_owner'|| (role === 'event_admin'|| role === 'organizer') && event.Tenant?.firebaseUid === uid) {
+        // Admin can see ALL events (including PENDING for review)
+        // Customers and venue owners can see APPROVED events
+        // Organizers and event admins can see their own events
+        if (role === 'admin') {
             return res.status(200).json({
                 data: event,
                 message: 'Event fetched successfully'
             });
-        } //{
-            return res.status(403).json({ error: 'Not Authorized to view this event' });
-        //}
+        }
+        
+        if (role === 'customer' || role === 'venue_owner') {
+            // Only show approved events to customers and venue owners
+            if (event.status !== 'APPROVED') {
+                return res.status(404).json({ error: 'Event not found' });
+            }
+            return res.status(200).json({
+                data: event,
+                message: 'Event fetched successfully'
+            });
+        }
+        
+        if ((role === 'event_admin' || role === 'organizer') && event.Tenant?.firebaseUid === uid) {
+            // Organizers and event admins can see their own events regardless of status
+            return res.status(200).json({
+                data: event,
+                message: 'Event fetched successfully'
+            });
+        }
+        
+        return res.status(403).json({ error: 'Not Authorized to view this event' });
 
-    }catch (error) {
-        console.error('Failed to fetch event:',error);
+    } catch (error) {
+        console.error('Failed to fetch event:', error);
         res.status(500).json({ error: 'Internal server error' });
     }
 } 
@@ -503,6 +576,7 @@ export const updateEvent = async (req: Request, res: Response) => {
         endDate, 
         startTime, 
         endTime, 
+        capacity, 
         checkinOfficerUids 
     } = req.body;
 
@@ -516,26 +590,9 @@ export const updateEvent = async (req: Request, res: Response) => {
             return res.status(404).json({error: 'Event not found'});
         }
 
-        // Authorization check
-        const isAdmin = role === 'admin';
-        const isOrganizer = role === 'organizer' && existing.Tenant?.firebaseUid === uid;
-        const isEventAdmin = role === 'event_admin' && existing.eventAdminUid === uid;
-        const isCheckinOfficer = role === 'checkin_officer' && existing.checkinOfficerUids?.includes(uid);
-
-        // Allow: admin (all events), organizer (their events), event_admin (assigned events)
-        // Checkin officers can only view, not edit
-        if (!isAdmin && !isOrganizer && !isEventAdmin) {
-            console.log('❌ Authorization failed:', { role, uid, eventAdminUid: existing.eventAdminUid, tenantFirebaseUid: existing.Tenant?.firebaseUid });
-            return res.status(403).json({
-                error: 'You are not authorized to update this event',
-                details: {
-                    yourRole: role,
-                    requiredRole: 'admin, organizer (owner), or event_admin (assigned)'
-                }
-            });
+        if((role === 'event_admin'|| role === 'organizer') && existing.Tenant?.firebaseUid !== uid){
+            return res.status(403).json({error: 'You are not authorized to update this event'})
         }
-
-        console.log('✅ Authorization passed:', { role, uid, authorized: true });
 
         // Build update data object, only including fields that are provided
         const updateData: any = {};
@@ -545,6 +602,7 @@ export const updateEvent = async (req: Request, res: Response) => {
         if (endDate !== undefined) updateData.endDate = new Date(endDate);
         if (startTime !== undefined) updateData.startTime = startTime;
         if (endTime !== undefined) updateData.endTime = endTime;
+        if (capacity !== undefined) updateData.capacity = parseInt(capacity);
         if (checkinOfficerUids !== undefined) {
             // Clean and validate checkinOfficerUids
             const cleanUids = Array.isArray(checkinOfficerUids) 
@@ -588,22 +646,9 @@ export const deleteEvent = async ( req: Request , res: Response ) => {
             return res.status(404).json({error:'Event not found'})
         }
 
-        // Authorization check - only organizer (owner) and admin can delete
-        const isAdmin = role === 'admin';
-        const isOrganizer = role === 'organizer' && existing.Tenant?.firebaseUid === uid;
-
-        if (!isAdmin && !isOrganizer) {
-            console.log('❌ Delete authorization failed:', { role, uid, tenantFirebaseUid: existing.Tenant?.firebaseUid });
-            return res.status(403).json({
-                error: 'You are not authorized to delete this event',
-                details: {
-                    yourRole: role,
-                    requiredRole: 'admin or organizer (owner only)'
-                }
-            });
+        if(role==='organizer' && existing.Tenant?.firebaseUid !== uid ){
+            return res.status(403).json({error:'You are not authorized to delete the event'});
         }
-
-        console.log('✅ Delete authorization passed:', { role, uid, authorized: true });
 
         await getPrisma().events.delete({
             where : { id : eventId}
@@ -800,10 +845,16 @@ export const getEventsByOrganizer = async (req: Request, res: Response) => {
             });
         }
 
+        console.log('📋 Fetching events for organizer:', {
+            organizerId,
+            tenantId: tenant.id,
+            tenantName: tenant.name
+        });
+
         // Fetch events for this tenant/organizer
         const events = await getPrisma().events.findMany({
             where: { 
-                tenantId: (tenant as any).tenantId || tenant.id
+                tenantId: tenant.id
                 // Note: Not filtering by status here so organizers can see all their events
             },
             select: {
