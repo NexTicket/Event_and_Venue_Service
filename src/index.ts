@@ -16,6 +16,7 @@ app.use(cors());
 app.use(helmet());
 app.use(morgan('dev'));
 
+<<<<<<< HEAD
 // Add request logging middleware
 app.use((req, res, next) => {
   console.log(`📨 ${new Date().toISOString()} - ${req.method} ${req.url}`);
@@ -23,6 +24,8 @@ app.use((req, res, next) => {
   next();
 });
 
+=======
+>>>>>>> b60000d1e117960e27f361965b188da2d1ef361b
 /* ───────────── body-parsers ─────────────
    Skip multipart/form-data requests – let multer handle them */
 app.use((req, res, next) => {
@@ -59,6 +62,7 @@ const PORT = process.env.PORT || 8000;
 export default app;
 
 if (process.env.NODE_ENV !== 'test') {
+<<<<<<< HEAD
   const server = app.listen(PORT, () => {
     console.log(`🚀  EVMS server running on port ${PORT}`);
   });
@@ -67,4 +71,9 @@ if (process.env.NODE_ENV !== 'test') {
   server.timeout = 120000; // 120 seconds
   server.keepAliveTimeout = 65000; // 65 seconds
   server.headersTimeout = 66000; // 66 seconds
+=======
+  app.listen(PORT, () => {
+    console.log(`🚀  EVMS server running on port ${PORT}`);
+  });
+>>>>>>> b60000d1e117960e27f361965b188da2d1ef361b
 }

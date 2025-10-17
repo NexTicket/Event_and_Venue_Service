@@ -2,6 +2,7 @@ import request from 'supertest';
 import app from '../../src';
 
 describe('PUT /api/events/update-event/:id', () => {
+<<<<<<< HEAD
   beforeEach(() => {
     jest.clearAllMocks();
   });
@@ -58,6 +59,10 @@ describe('PUT /api/events/update-event/:id', () => {
 
   it('should return 404 when trying to update non-existent event', async () => {
     const token = 'test-token-123';
+=======
+  it('should return 404 when trying to update non-existent event', async () => {
+    const token = 'organizer-token-123'; // Use valid organizer token
+>>>>>>> b60000d1e117960e27f361965b188da2d1ef361b
     const eventId = 999;
     const updateData = {
       title: 'Updated Event Title',
@@ -93,7 +98,11 @@ describe('PUT /api/events/update-event/:id', () => {
   });
 
   it('should handle partial updates', async () => {
+<<<<<<< HEAD
     const token = 'test-token-123';
+=======
+    const token = 'organizer-token-123'; // Use valid organizer token
+>>>>>>> b60000d1e117960e27f361965b188da2d1ef361b
     const eventId = 1;
     const updateData = {
       title: 'Updated Title Only'
@@ -137,7 +146,11 @@ describe('PUT /api/events/update-event/:id', () => {
   });
 
   it('should handle invalid event ID parameter', async () => {
+<<<<<<< HEAD
     const token = 'test-token-123';
+=======
+    const token = 'organizer-token-123'; // Use valid organizer token
+>>>>>>> b60000d1e117960e27f361965b188da2d1ef361b
     const invalidEventId = 'invalid';
     const updateData = {
       title: 'Updated Title'
@@ -150,6 +163,7 @@ describe('PUT /api/events/update-event/:id', () => {
 
     expect(res.status).toBe(404);
   });
+<<<<<<< HEAD
 
   it('should handle database errors during update', async () => {
     const token = 'test-token-123';
@@ -186,4 +200,6 @@ describe('PUT /api/events/update-event/:id', () => {
     expect(res.status).toBe(500);
     expect(res.body.error).toBe('Internal server error');
   });
+=======
+>>>>>>> b60000d1e117960e27f361965b188da2d1ef361b
 });

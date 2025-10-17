@@ -37,6 +37,7 @@ describe('GET /api/events', () => {
       expect(event).toHaveProperty('venue');
     }
   });
+<<<<<<< HEAD
 
   it('should handle empty events list', async () => {
     // Configure mock to return empty array
@@ -68,4 +69,6 @@ describe('GET /api/events', () => {
     expect(res.status).toBe(500);
     expect(res.body.error).toBe('Internal server error');
   });
+=======
+>>>>>>> b60000d1e117960e27f361965b188da2d1ef361b
 });

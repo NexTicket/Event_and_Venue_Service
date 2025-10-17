@@ -2,12 +2,17 @@ import request from 'supertest';
 import app from '../../src';
 
 describe('DELETE /api/events/delete-event/:id', () => {
+<<<<<<< HEAD
   beforeEach(() => {
     jest.clearAllMocks();
   });
 
   it('should delete an event successfully', async () => {
     const token = 'test-token-123';
+=======
+  it('should delete an event successfully', async () => {
+    const token = 'organizer-token-123'; // Use valid organizer token
+>>>>>>> b60000d1e117960e27f361965b188da2d1ef361b
     const eventId = 1;
 
     // Mock existing event
@@ -36,7 +41,11 @@ describe('DELETE /api/events/delete-event/:id', () => {
   });
 
   it('should return 404 when trying to delete non-existent event', async () => {
+<<<<<<< HEAD
     const token = 'test-token-123';
+=======
+    const token = 'organizer-token-123'; // Use valid organizer token
+>>>>>>> b60000d1e117960e27f361965b188da2d1ef361b
     const eventId = 999;
 
     const res = await request(app)
@@ -58,7 +67,11 @@ describe('DELETE /api/events/delete-event/:id', () => {
   });
 
   it('should handle invalid event ID parameter', async () => {
+<<<<<<< HEAD
     const token = 'test-token-123';
+=======
+    const token = 'organizer-token-123'; // Use valid organizer token
+>>>>>>> b60000d1e117960e27f361965b188da2d1ef361b
     const invalidEventId = 'invalid';
 
     const res = await request(app)
@@ -68,6 +81,7 @@ describe('DELETE /api/events/delete-event/:id', () => {
     // The parseInt will return NaN, which should be handled gracefully
     expect(res.status).toBe(404);
   });
+<<<<<<< HEAD
 
   it('should handle database errors during deletion', async () => {
     const token = 'test-token-123';
@@ -100,4 +114,6 @@ describe('DELETE /api/events/delete-event/:id', () => {
     expect(res.status).toBe(500);
     expect(res.body.error).toBe('Internal server error');
   });
+=======
+>>>>>>> b60000d1e117960e27f361965b188da2d1ef361b
 });

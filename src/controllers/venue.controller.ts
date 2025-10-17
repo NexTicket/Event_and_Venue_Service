@@ -120,9 +120,13 @@ export const addVenue = async (req: Request, res: Response) => {
         longitude: longitude ? parseFloat(longitude) : null,
         description: description || null,
         availability: availability || null,
+<<<<<<< HEAD
         amenities: amenities || null,
         contactEmail: contact?.email || null,
         contactPhone: contact?.phone || null
+=======
+        amenities: amenities || null
+>>>>>>> b60000d1e117960e27f361965b188da2d1ef361b
       }
     });
 
@@ -226,7 +230,10 @@ export const deleteVenue = async (req: Request, res: Response) => {
 // GET /venues/:id/seats - View Seat Map
 export const getSeatMap = async (req: Request, res: Response) => {
   const venueId = parseInt(req.params.id);
+<<<<<<< HEAD
   const { role } = req.user;
+=======
+>>>>>>> b60000d1e117960e27f361965b188da2d1ef361b
 
   try {
     const venue = await getPrisma().venue.findUnique({
@@ -455,8 +462,12 @@ export const updateVenue = async (req: Request, res: Response) => {
         ...(latitude !== undefined && { latitude: parseFloat(latitude) }),
         ...(longitude !== undefined && { longitude: parseFloat(longitude) }),
         ...(description !== undefined && { description }),
+<<<<<<< HEAD
         ...(contact?.email !== undefined && { contactEmail: contact.email }),
         ...(contact?.phone !== undefined && { contactPhone: contact.phone }),
+=======
+        ...(contact && { contact }),
+>>>>>>> b60000d1e117960e27f361965b188da2d1ef361b
         ...(amenities && { amenities }),
         ...(availability && { availability })
       },

@@ -2,6 +2,7 @@ import request from 'supertest';
 import app from '../../src';
 
 describe('POST /api/events/:eventId/image', () => {
+<<<<<<< HEAD
   beforeEach(() => {
     jest.clearAllMocks();
   });
@@ -53,6 +54,8 @@ describe('POST /api/events/:eventId/image', () => {
     expect(res.body.error).toBe('No image file provided');
   });
 
+=======
+>>>>>>> b60000d1e117960e27f361965b188da2d1ef361b
   it('should return 401 without authorization token', async () => {
     const eventId = 1;
 
@@ -91,6 +94,7 @@ describe('POST /api/events/:eventId/image', () => {
     expect(res.status).toBe(400);
     expect(res.body.error).toBe('No image file provided');
   });
+<<<<<<< HEAD
 
   it('should handle invalid event ID parameter', async () => {
     const token = 'organizer-token-123';
@@ -140,4 +144,6 @@ describe('POST /api/events/:eventId/image', () => {
     expect(res.status).toBe(500);
     expect(res.body.error).toBe('Internal server error');
   });
+=======
+>>>>>>> b60000d1e117960e27f361965b188da2d1ef361b
 });

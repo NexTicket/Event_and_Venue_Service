@@ -2,6 +2,7 @@ import request from 'supertest';
 import app from '../../src';
 
 describe('Unauthorized Access Tests', () => {
+<<<<<<< HEAD
   beforeEach(() => {
     // Reset all mocks before each test
     jest.clearAllMocks();
@@ -12,6 +13,13 @@ describe('Unauthorized Access Tests', () => {
       const endpoints = [
         { method: 'post' as const, path: '/api/venues' },
         { method: 'get' as const, path: '/api/venues/getvenuebyid/1' },
+=======
+  describe('Authentication Tests', () => {
+    it('should deny access without authorization header', async () => {
+      // Only test endpoints that REQUIRE authentication (use verifyToken middleware)
+      const endpoints = [
+        { method: 'post' as const, path: '/api/venues' },
+>>>>>>> b60000d1e117960e27f361965b188da2d1ef361b
         { method: 'put' as const, path: '/api/venues/updatevenue/1' },
         { method: 'delete' as const, path: '/api/venues/deletevenue/1' },
       ];
@@ -44,6 +52,7 @@ describe('Unauthorized Access Tests', () => {
     });
 
     it('should deny access with invalid token', async () => {
+<<<<<<< HEAD
       // Mock Firebase to reject invalid tokens
       const { getAuth } = await import('firebase-admin/auth');
       const mockAuth = getAuth();
@@ -52,12 +61,18 @@ describe('Unauthorized Access Tests', () => {
       const res = await request(app)
         .post('/api/venues')
         .set('Authorization', 'Bearer invalid-token');
+=======
+      const res = await request(app)
+        .post('/api/venues')
+        .set('Authorization', 'Bearer invalid-token-xyz');
+>>>>>>> b60000d1e117960e27f361965b188da2d1ef361b
       
       expect(res.status).toBe(401);
       expect(res.body.error).toBe('Invalid token');
     });
 
     it('should deny access with expired token', async () => {
+<<<<<<< HEAD
       // Mock Firebase to reject expired tokens
       const { getAuth } = await import('firebase-admin/auth');
       const mockAuth = getAuth();
@@ -66,6 +81,12 @@ describe('Unauthorized Access Tests', () => {
       const res = await request(app)
         .post('/api/venues')
         .set('Authorization', 'Bearer expired-token');
+=======
+      // Our mock doesn't have expired tokens, but we test with an invalid token
+      const res = await request(app)
+        .post('/api/venues')
+        .set('Authorization', 'Bearer expired-token-xyz');
+>>>>>>> b60000d1e117960e27f361965b188da2d1ef361b
       
       expect(res.status).toBe(401);
       expect(res.body.error).toBe('Invalid token');
@@ -78,16 +99,29 @@ describe('Unauthorized Access Tests', () => {
         name: 'Test Venue',
         location: 'Test Location',
         capacity: 100,
+<<<<<<< HEAD
         seatMap: { rows: 10, columns: 10 }
+=======
+        seatMap: { rows: 10, columns: 10 },
+        type: 'Conference Hall'
+>>>>>>> b60000d1e117960e27f361965b188da2d1ef361b
       };
 
       const res = await request(app)
         .post('/api/venues')
+<<<<<<< HEAD
         .set('Authorization', 'Bearer customer-token')
         .send(venueData);
       
       expect(res.status).toBe(403);
       expect(res.body.error).toBe('Only venue owners can add venues');
+=======
+        .set('Authorization', 'Bearer customer-token-123')
+        .send(venueData);
+      
+      expect(res.status).toBe(403);
+      expect(res.body.error).toBe('Only venue owners and organizers can add venues');
+>>>>>>> b60000d1e117960e27f361965b188da2d1ef361b
     });
 
     it('should deny venue creation for users without role', async () => {
@@ -95,6 +129,7 @@ describe('Unauthorized Access Tests', () => {
         name: 'Test Venue',
         location: 'Test Location',
         capacity: 100,
+<<<<<<< HEAD
         seatMap: { rows: 10, columns: 10 }
       };
 
@@ -105,6 +140,20 @@ describe('Unauthorized Access Tests', () => {
       
       expect(res.status).toBe(403);
       expect(res.body.error).toBe('Only venue owners can add venues');
+=======
+        seatMap: { rows: 10, columns: 10 },
+        type: 'Conference Hall'
+      };
+
+      // Use an invalid token that will fail verification
+      const res = await request(app)
+        .post('/api/venues')
+        .set('Authorization', 'Bearer no-role-token-xyz')
+        .send(venueData);
+      
+      expect(res.status).toBe(401);
+      expect(res.body.error).toBe('Invalid token');
+>>>>>>> b60000d1e117960e27f361965b188da2d1ef361b
     });
 
     it('should allow venue creation for venue owners', async () => {
@@ -112,12 +161,21 @@ describe('Unauthorized Access Tests', () => {
         name: 'Test Venue',
         location: 'Test Location',
         capacity: 100,
+<<<<<<< HEAD
         seatMap: { rows: 10, columns: 10 }
+=======
+        seatMap: { rows: 10, columns: 10 },
+        type: 'Conference Hall'
+>>>>>>> b60000d1e117960e27f361965b188da2d1ef361b
       };
 
       const res = await request(app)
         .post('/api/venues')
+<<<<<<< HEAD
         .set('Authorization', 'Bearer venue-owner-token')
+=======
+        .set('Authorization', 'Bearer venue-owner-token-123')
+>>>>>>> b60000d1e117960e27f361965b188da2d1ef361b
         .send(venueData);
       
       expect(res.status).toBe(201);
@@ -147,17 +205,30 @@ describe('Unauthorized Access Tests', () => {
 
   describe('Tenant Association Tests', () => {
     it('should handle venue creation when tenant does not exist', async () => {
+<<<<<<< HEAD
       // The global setup already handles this scenario for venue-owner-token
+=======
+      // The autoCreateTenant utility should create a tenant if it doesn't exist
+>>>>>>> b60000d1e117960e27f361965b188da2d1ef361b
       const venueData = {
         name: 'Test Venue',
         location: 'Test Location',
         capacity: 100,
+<<<<<<< HEAD
         seatMap: { rows: 10, columns: 10 }
+=======
+        seatMap: { rows: 10, columns: 10 },
+        type: 'Conference Hall'
+>>>>>>> b60000d1e117960e27f361965b188da2d1ef361b
       };
 
       const res = await request(app)
         .post('/api/venues')
+<<<<<<< HEAD
         .set('Authorization', 'Bearer venue-owner-token')
+=======
+        .set('Authorization', 'Bearer venue-owner-token-123')
+>>>>>>> b60000d1e117960e27f361965b188da2d1ef361b
         .send(venueData);
       
       expect(res.status).toBe(201);
