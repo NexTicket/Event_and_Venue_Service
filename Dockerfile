@@ -48,8 +48,13 @@ COPY prisma ./prisma
 # Generate Prisma Client in production environment
 RUN npx prisma generate
 
-# Copy built application from builder
+# Copy built application from builder - Copy the entire dist folder with all subdirectories
 COPY --from=builder /app/dist ./dist
+
+# Verify the dist structure was copied correctly
+RUN ls -la /app/dist && \
+    ls -la /app/dist/routes && \
+    echo "✅ Dist folder structure verified"
 
 # Copy the generated Prisma client from builder stage to ensure completeness
 COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
@@ -58,13 +63,43 @@ COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
 # Remove prisma CLI after everything is copied to keep image small
 RUN npm uninstall prisma
 
-# Expose the port
-EXPOSE 4000
+# Cloud Run sets PORT environment variable, default to 8080 if not set
+ENV PORT=8080
+
+# # Expose the port (Cloud Run will override this)
+EXPOSE 8080
 
 # Health check
-HEALTHCHECK --interval=30s --timeout=3s --start-period=40s --retries=3 \
-  CMD node -e "require('http').get('http://localhost:4000/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+  CMD node -e "require('http').get('http://localhost:' + (process.env.PORT || 8080) + '/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"
 
-# Start the application
-CMD ["node", "dist/index.js"]
+# Create a proper startup script
+COPY <<'EOF' /app/start.sh
+#!/bin/sh
+set -e
+
+# Ensure we're in the right directory
+cd /app
+
+echo "📂 Working directory: $(pwd)"
+echo "📋 Contents of /app:"
+ls -la
+
+echo "📋 Contents of /app/dist:"
+ls -la dist/
+
+echo "📋 Contents of /app/dist/routes:"
+ls -la dist/routes/
+
+echo "� Running Prisma migrations..."
+npx prisma migrate deploy
+
+echo "✅ Migrations complete. Starting server..."
+exec node dist/index.js
+EOF
+
+RUN chmod +x /app/start.sh
+
+# Start the application with migrations
+CMD ["/app/start.sh"]
 
