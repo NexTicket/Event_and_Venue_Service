@@ -48,12 +48,12 @@ app.use('/api', tenantRoutes);  // tenant management routes
 app.use('/api', eventRoutes);
 
 /* ───────────── server ───────────── */
-const PORT = process.env.PORT || 8000;
-
-export default app;
+const PORT = process.env.PORT || 8080;
 
 if (process.env.NODE_ENV !== 'test') {
   app.listen(PORT, () => {
-    console.log(`🚀  EVMS server running on port ${PORT}`);
+    console.log(`🚀 EVMS server running on port ${PORT}`);
   });
 }
+
+export default app;
