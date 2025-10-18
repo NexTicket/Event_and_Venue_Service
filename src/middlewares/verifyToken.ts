@@ -17,6 +17,24 @@ if (process.env.NODE_ENV !== 'test' && process.env.FIREBASE_SERVICE_ACCOUNT_KEY)
 }
 
 export const verifyToken = async (req: Request, res: Response, next: NextFunction) => {
+  // 🔑 Check if API Gateway already authenticated (trust X-User-* headers)
+  const xUserId = req.headers['x-user-id'] as string;
+  const xUserEmail = req.headers['x-user-email'] as string;
+  const xUserRole = req.headers['x-user-role'] as string;
+
+  if (xUserId && xUserEmail && xUserRole) {
+    // API Gateway already authenticated - trust the headers
+    console.log(`✅ Using API Gateway auth: ${xUserEmail} (${xUserRole})`);
+    req.user = {
+      uid: xUserId,
+      role: xUserRole,
+      email: xUserEmail,
+      name: xUserEmail.split('@')[0], // Extract name from email
+    };
+    return next();
+  }
+
+  // No API Gateway headers - verify token directly
   const authHeader = req.headers.authorization;
 
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
