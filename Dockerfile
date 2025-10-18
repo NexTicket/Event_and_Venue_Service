@@ -1,70 +1,33 @@
-# Dockerfile for Event and Venue Service (TypeScript + Prisma)
+# Development Dockerfile with hot-reload support
 
-# ---- Stage 1: Dependencies ----
-FROM node:18-alpine AS deps
+FROM node:20-alpine
+
+# Install development tools
+RUN apk add --no-cache bash git
+
+# Set working directory
 WORKDIR /app
+
+# Set NODE_ENV to development
+ENV NODE_ENV=development
 
 # Copy package files
 COPY package*.json ./
 
-# Install ALL dependencies (including dev dependencies for build)
-RUN npm ci
+# Install all dependencies (including dev dependencies)
+RUN npm install
 
-# ---- Stage 2: Builder ----
-FROM node:18-alpine AS builder
-WORKDIR /app
-
-# Copy dependencies from deps stage
-COPY --from=deps /app/node_modules ./node_modules
-
-# Copy source code and config files
-COPY . .
+# Copy prisma schema
+COPY prisma ./prisma/
 
 # Generate Prisma Client
 RUN npx prisma generate
 
-# Build TypeScript
-RUN npm run build
+# Copy source code
+COPY . .
 
-# ---- Stage 3: Production ----
-FROM node:18-alpine AS runner
-WORKDIR /app
+# Expose the application port
+EXPOSE 4001
 
-# Set to production
-ENV NODE_ENV=production
-
-# Copy package files
-COPY package*.json ./
-
-# Install only production dependencies
-RUN npm ci --only=production
-
-# Install prisma CLI temporarily for generation
-RUN npm install -D prisma
-
-# Copy Prisma schema and migrations
-COPY prisma ./prisma
-
-# Generate Prisma Client in production environment
-RUN npx prisma generate
-
-# Copy built application from builder
-COPY --from=builder /app/dist ./dist
-
-# Copy the generated Prisma client from builder stage to ensure completeness
-COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
-COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
-
-# Remove prisma CLI after everything is copied to keep image small
-RUN npm uninstall prisma
-
-# Expose the port
-EXPOSE 4000
-
-# Health check
-HEALTHCHECK --interval=30s --timeout=3s --start-period=40s --retries=3 \
-  CMD node -e "require('http').get('http://localhost:4000/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"
-
-# Start the application
-CMD ["node", "dist/index.js"]
-
+# Start the application with hot-reload using tsx watch
+CMD ["npm", "run", "dev"]
