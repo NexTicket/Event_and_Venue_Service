@@ -1,8 +1,8 @@
 import  express  from "express";
-import { addVenue, deleteVenue, getAllVenues, getSeatMap, getVenueById, updateSeatMap, updateVenue, uploadVenueImage, getMyVenues, getVenuesByType, getFilteredVenues, getVenueAvailability } from "../controllers/venue.controller";
-import { verifyToken } from "../middlewares/verifyToken";
-import { optionalAuth } from "../middlewares/optionalAuth";
-import upload from "../middlewares/upload";
+import { addVenue, deleteVenue, getAllVenues, getSeatMap, getVenueById, updateSeatMap, updateVenue, uploadVenueImage, getMyVenues, getVenuesByType, getFilteredVenues, getVenueAvailability } from "../controllers/venue.controller.js";
+import { verifyToken } from "../middlewares/verifyToken.js";
+import { optionalAuth } from "../middlewares/optionalAuth.js";
+import upload from "../middlewares/upload.js";
 
 const router = express.Router();
 
