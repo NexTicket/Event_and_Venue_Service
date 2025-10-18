@@ -12,15 +12,22 @@ router.get('/venues', optionalAuth, async (req, res) => {
     return getAllVenues(req,res);
 });
 
+// Specific routes MUST come before parameterized routes to avoid matching issues
+router.get('/venues/myvenues', verifyToken, getMyVenues);
+router.get('/venues/filter', optionalAuth, getFilteredVenues);
+router.get('/venues/type/:type', optionalAuth, getVenuesByType);
+
+// General venue routes
 router.post('/venues', verifyToken, addVenue);
 router.get('/venues/getvenuebyid/:id', optionalAuth, getVenueById);
 router.put('/venues/updatevenue/:id', verifyToken, updateVenue);
 router.delete('/venues/deletevenue/:id', verifyToken, deleteVenue);
+
+// Seat-related routes
 router.get('/venues/:id/seats', optionalAuth, getSeatMap); // Changed to optionalAuth for public viewing
 router.patch('/venues/:id/seats', verifyToken, updateSeatMap);
-router.get('/venues/myvenues', verifyToken, getMyVenues);
-router.get('/venues/type/:type', optionalAuth, getVenuesByType);
-router.get('/venues/filter', optionalAuth, getFilteredVenues);
+
+// Availability route
 router.get('/venues/:venueId/availability', optionalAuth, getVenueAvailability);
 
 router.post('/venues/:id/image', (req, res, next) => {
