@@ -49,10 +49,10 @@ app.use('/api', eventRoutes);
 /* ───────────── server ───────────── */
 const PORT = process.env.PORT || 8080;
 
-export default app;
-
 if (process.env.NODE_ENV !== 'test') {
   app.listen(PORT, () => {
-    console.log(`🚀  EVMS server running on port ${PORT}`);
+    console.log(`🚀 EVMS server running on port ${PORT}`);
   });
 }
+
+export default app;
