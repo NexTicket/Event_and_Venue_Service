@@ -27,7 +27,7 @@ RUN npx prisma generate
 COPY . .
 
 # Expose the application port
-EXPOSE 4001
+EXPOSE 4000
 
 # Start the application with hot-reload using tsx watch
 CMD ["npm", "run", "dev"]
