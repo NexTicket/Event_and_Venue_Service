@@ -1,4 +1,4 @@
-import { PrismaClient } from "../../generated/prisma/index";
+import { PrismaClient } from "@prisma/client";
 import {Request, Response} from 'express';
 import { setUserRole } from "../utils/userRoles";
 // Removed: import { ensureTenantExists } from '../utils/autoCreateTenant.js';

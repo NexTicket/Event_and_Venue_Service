@@ -1,4 +1,4 @@
-import { PrismaClient } from "../../generated/prisma/index";
+import { PrismaClient } from "@prisma/client";
 import { Request,Response } from 'express';
 import cloudinary from '../utils/cloudinary';
 // Removed: import { ensureTenantExists } from '../utils/autoCreateTenant.js';

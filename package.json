@@ -8,7 +8,7 @@
     "test": "NODE_OPTIONS='--experimental-vm-modules' jest --config=jest.config.mjs",
     "test:watch": "NODE_OPTIONS='--experimental-vm-modules' jest --config=jest.config.mjs --watch",
     "test:coverage": "NODE_OPTIONS='--experimental-vm-modules' jest --config=jest.config.mjs --coverage",
-    "build": "tsc"
+    "build": "prisma generate && tsc"
   },
   "type": "module",
   "dependencies": {
