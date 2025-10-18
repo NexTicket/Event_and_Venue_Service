@@ -23,7 +23,7 @@ COPY . .
 # Generate Prisma Client
 RUN npx prisma generate
 
-# Build TypeScript (this creates the dist folder)
+# Build TypeScript
 RUN npm run build
 
 # ---- Stage 3: Production ----
@@ -39,7 +39,7 @@ COPY package*.json ./
 # Install only production dependencies
 RUN npm ci --only=production
 
-# Install prisma CLI temporarily for migrations
+# Install prisma CLI temporarily for generation
 RUN npm install -D prisma
 
 # Copy Prisma schema and migrations
@@ -51,12 +51,6 @@ RUN npx prisma generate
 # Copy built application from builder
 COPY --from=builder /app/dist ./dist
 
-# Verify the dist structure was copied correctly
-RUN echo "✅ Verifying dist folder structure..." && \
-    ls -la /app/dist && \
-    ls -la /app/dist/routes && \
-    echo "✅ Dist folder structure verified"
-
 # Copy the generated Prisma client from builder stage to ensure completeness
 COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
 COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
@@ -64,42 +58,13 @@ COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
 # Remove prisma CLI after everything is copied to keep image small
 RUN npm uninstall prisma
 
-# Cloud Run sets PORT environment variable automatically
-ENV PORT=8080
-
 # Expose the port
-EXPOSE 8080
+EXPOSE 4000
 
 # Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
-  CMD node -e "require('http').get('http://localhost:' + (process.env.PORT || 8080) + '/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"
+HEALTHCHECK --interval=30s --timeout=3s --start-period=40s --retries=3 \
+  CMD node -e "require('http').get('http://localhost:4000/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"
 
-# Create a proper startup script
-COPY <<'EOF' /app/start.sh
-#!/bin/sh
-set -e
+# Start the application
+CMD ["node", "dist/index.js"]
 
-# Ensure we're in the right directory
-cd /app
-
-echo "📂 Working directory: $(pwd)"
-echo "📋 Contents of /app/dist:"
-ls -la dist/ || echo "❌ dist folder not found!"
-
-echo "📋 Contents of /app/dist/routes:"
-ls -la dist/routes/ || echo "❌ dist/routes folder not found!"
-
-echo "🔄 Running Prisma migrations..."
-npx prisma migrate deploy
-
-echo "✅ Migrations complete. Starting server..."
-echo "🚀 Starting application with: node dist/index.js"
-
-# Use exec to replace shell with node process
-exec node dist/index.js
-EOF
-
-RUN chmod +x /app/start.sh
-
-# Start the application with migrations
-CMD ["/app/start.sh"]

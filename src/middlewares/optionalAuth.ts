@@ -6,6 +6,22 @@ import { getAuth } from 'firebase-admin/auth';
 export const optionalAuth = async (req: Request, res: Response, next: NextFunction) => {
   const authHeader = req.headers.authorization;
 
+  // Check if user info was already set by API Gateway (via X-User-* headers)
+  const userIdHeader = req.headers['x-user-id'] as string;
+  const userEmailHeader = req.headers['x-user-email'] as string;
+  const userRoleHeader = req.headers['x-user-role'] as string;
+  
+  if (userIdHeader && userEmailHeader) {
+    // User was authenticated by API Gateway
+    req.user = {
+      uid: userIdHeader,
+      email: userEmailHeader,
+      role: userRoleHeader || 'customer', // Use role from gateway or default to customer
+    };
+    console.log('👤 User authenticated by API Gateway:', req.user);
+    return next();
+  }
+
   // If no auth header, continue without setting req.user
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
     console.log('👤 No authentication provided - continuing as public request');
