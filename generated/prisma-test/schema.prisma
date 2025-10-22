@@ -1,0 +1,64 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../generated/prisma-test"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./test.db"
+}
+
+model Tenant {
+  id          Int      @id @default(autoincrement())
+  name        String
+  createdAt   DateTime @default(now())
+  firebaseUid String?  @unique
+  venues      Venue[]
+  events      events[]
+}
+
+model Venue {
+  id            Int      @id @default(autoincrement())
+  name          String
+  seatMap       String
+  tenantId      Int
+  capacity      Int?
+  location      String?
+  image         String?
+  ownerUid      String?
+  description   String?
+  featuredImage String?
+  images        String
+  amenities     String?
+  availability  String?
+  contactEmail  String?
+  contactPhone  String?
+  latitude      Float?
+  longitude     Float?
+  type          String?
+  tenant        Tenant   @relation(fields: [tenantId], references: [id])
+  events        events[]
+}
+
+model events {
+  id          Int       @id @default(autoincrement())
+  tenantId    Int
+  title       String
+  description String
+  category    String
+  type        String
+  startDate   DateTime?
+  endDate     DateTime?
+  startTime   String?
+  endTime     String?
+  venueId     Int?
+  image       String?
+  ticketPrice Float?
+  maxTickets  Int?
+  soldTickets Int?      @default(0)
+  status      String?   @default("DRAFT")
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  tenant      Tenant    @relation(fields: [tenantId], references: [id])
+  venue       Venue?    @relation(fields: [venueId], references: [id])
+}

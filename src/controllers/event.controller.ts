@@ -1,10 +1,7 @@
 import { PrismaClient } from "../../generated/prisma/index";
 import { Request,Response } from 'express';
 import cloudinary from '../utils/cloudinary';
-<<<<<<< HEAD
 import { smsService } from '../services/sms.service';
-=======
->>>>>>> b60000d1e117960e27f361965b188da2d1ef361b
 // Removed: import { ensureTenantExists } from '../utils/autoCreateTenant.js';
 // Now using User-Service API for tenant operations
 
@@ -12,31 +9,22 @@ import { smsService } from '../services/sms.service';
 const ensureTenantViaUserService = async (user: any, authToken: string) => {
   try {
     const userServiceUrl = process.env.USER_SERVICE_URL || 'http://localhost:4001';
-<<<<<<< HEAD
     
     // Add AbortController for timeout
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
     
-=======
->>>>>>> b60000d1e117960e27f361965b188da2d1ef361b
     const response = await fetch(`${userServiceUrl}/api/users/ensure-tenant`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${authToken}`
-<<<<<<< HEAD
       },
       signal: controller.signal
     });
 
     clearTimeout(timeoutId);
 
-=======
-      }
-    });
-
->>>>>>> b60000d1e117960e27f361965b188da2d1ef361b
     if (!response.ok) {
       console.error('Failed to ensure tenant via User-Service:', response.status, await response.text());
       return null;
@@ -340,11 +328,6 @@ export const getEventsByCheckinOfficer = async (req: Request, res: Response) => 
 };
 
 export const addEvent = async (req: Request, res: Response) => {
-<<<<<<< HEAD
-    console.log('🎫 AddEvent function called');
-=======
-
->>>>>>> b60000d1e117960e27f361965b188da2d1ef361b
     const user = req.user;
     
     console.log('🎫 AddEvent - User details:', {
@@ -355,19 +338,11 @@ export const addEvent = async (req: Request, res: Response) => {
         name: user?.name
     });
     
-<<<<<<< HEAD
-    // Only allow organizers to create events
-    if (!user || user.role !== 'organizer') {
-        console.log('❌ Authorization failed - user must be organizer:', user?.role);
-        return res.status(403).json({
-            error: 'Only registered organizers can create events',
-=======
     // For development: Allow admin and customer roles in addition to organizer
     if (!user || !['organizer', 'admin', 'customer'].includes(user.role)) {
         console.log('❌ Authorization failed - invalid role:', user?.role);
         return res.status(403).json({
             error: 'Only registered organizers can add events',
->>>>>>> b60000d1e117960e27f361965b188da2d1ef361b
             userRole: user?.role,
             allowedRoles: ['organizer']
         });
@@ -375,18 +350,6 @@ export const addEvent = async (req: Request, res: Response) => {
     
     const { title, description, category, type, startDate, endDate, startTime, endTime, venueId, image } = req.body;
     
-<<<<<<< HEAD
-    console.log('📝 Request body fields:', {
-        title: !!title,
-        description: !!description,
-        category: !!category,
-        type: !!type,
-        startDate: !!startDate,
-        bodySize: JSON.stringify(req.body).length
-    });
-    
-=======
->>>>>>> b60000d1e117960e27f361965b188da2d1ef361b
     
     if(!title || !description || !category || !type || !startDate) {
         console.log('❌ Missing required fields');
@@ -431,24 +394,7 @@ export const addEvent = async (req: Request, res: Response) => {
             });
         }
         
-<<<<<<< HEAD
-        console.log('✅ Tenant found/created:', JSON.stringify(tenant, null, 2)); 
-        
-        // Extract tenantId from the tenant object - it could be under different property names
-        const tenantId = tenant?.tenantId || tenant?.id || tenant?.tenant?.id;
-        
-        if (!tenantId) {
-            console.log('❌ No valid tenantId found in tenant object:', tenant);
-            return res.status(400).json({
-                error: 'Invalid tenant data - no tenantId found',
-                tenantData: tenant
-            });
-        }
-        
-        console.log('🔑 Using tenantId:', tenantId);
-=======
         console.log('✅ Tenant found/created:', tenant.tenantId); 
->>>>>>> b60000d1e117960e27f361965b188da2d1ef361b
         
         // Parse dates properly - handle both date-only and full datetime strings
         const parseEventDate = (dateString: string) => {
@@ -473,11 +419,7 @@ export const addEvent = async (req: Request, res: Response) => {
                 endDate: eventEndDate,
                 startTime: startTime ?? null,
                 endTime: endTime ?? null,
-<<<<<<< HEAD
-                tenantId: tenantId,
-=======
                 tenantId: (tenant as any).tenantId || tenant.id,
->>>>>>> b60000d1e117960e27f361965b188da2d1ef361b
                 venueId: parsedVenueId,
                 image: image || null
             }
@@ -569,10 +511,6 @@ export const updateEvent = async (req: Request, res: Response) => {
         endDate, 
         startTime, 
         endTime, 
-<<<<<<< HEAD
-        capacity, 
-=======
->>>>>>> b60000d1e117960e27f361965b188da2d1ef361b
         checkinOfficerUids 
     } = req.body;
 
@@ -586,12 +524,6 @@ export const updateEvent = async (req: Request, res: Response) => {
             return res.status(404).json({error: 'Event not found'});
         }
 
-<<<<<<< HEAD
-        if((role === 'event_admin'|| role === 'organizer') && existing.Tenant?.firebaseUid !== uid){
-            return res.status(403).json({error: 'You are not authorized to update this event'})
-        }
-
-=======
         // Authorization check
         const isAdmin = role === 'admin';
         const isOrganizer = role === 'organizer' && existing.Tenant?.firebaseUid === uid;
@@ -613,7 +545,6 @@ export const updateEvent = async (req: Request, res: Response) => {
 
         console.log('✅ Authorization passed:', { role, uid, authorized: true });
 
->>>>>>> b60000d1e117960e27f361965b188da2d1ef361b
         // Build update data object, only including fields that are provided
         const updateData: any = {};
         if (title !== undefined) updateData.title = title;
@@ -622,10 +553,6 @@ export const updateEvent = async (req: Request, res: Response) => {
         if (endDate !== undefined) updateData.endDate = new Date(endDate);
         if (startTime !== undefined) updateData.startTime = startTime;
         if (endTime !== undefined) updateData.endTime = endTime;
-<<<<<<< HEAD
-        if (capacity !== undefined) updateData.capacity = parseInt(capacity);
-=======
->>>>>>> b60000d1e117960e27f361965b188da2d1ef361b
         if (checkinOfficerUids !== undefined) {
             // Clean and validate checkinOfficerUids
             const cleanUids = Array.isArray(checkinOfficerUids) 
@@ -669,12 +596,6 @@ export const deleteEvent = async ( req: Request , res: Response ) => {
             return res.status(404).json({error:'Event not found'})
         }
 
-<<<<<<< HEAD
-        if(role==='organizer' && existing.Tenant?.firebaseUid !== uid ){
-            return res.status(403).json({error:'You are not authorized to delete the event'});
-        }
-
-=======
         // Authorization check - only organizer (owner) and admin can delete
         const isAdmin = role === 'admin';
         const isOrganizer = role === 'organizer' && existing.Tenant?.firebaseUid === uid;
@@ -692,7 +613,6 @@ export const deleteEvent = async ( req: Request , res: Response ) => {
 
         console.log('✅ Delete authorization passed:', { role, uid, authorized: true });
 
->>>>>>> b60000d1e117960e27f361965b188da2d1ef361b
         await getPrisma().events.delete({
             where : { id : eventId}
         })
@@ -824,7 +744,6 @@ export const approveEvent = async (req: Request, res: Response) => {
 
         console.log('✅ Event approved successfully:', updatedEvent.id);
 
-<<<<<<< HEAD
         // Notify venue owner via SMS using Twilio
         if (updatedEvent.venue?.contactPhone) {
             await smsService.sendEventApprovalNotification(
@@ -834,8 +753,6 @@ export const approveEvent = async (req: Request, res: Response) => {
             );
         }
 
-=======
->>>>>>> b60000d1e117960e27f361965b188da2d1ef361b
         res.status(200).json({
             message: 'Event approved successfully',
             data: updatedEvent
