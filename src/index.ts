@@ -4,9 +4,9 @@ import helmet from 'helmet';
 import morgan from 'morgan';
 import dotenv from 'dotenv';
 
-import venueRoutes  from './routes/venue.routes';
-import tenantRoutes from './routes/tenant.routes';
-import eventRoutes  from './routes/events.routes';
+import venueRoutes  from './routes/venue.routes.js';
+import tenantRoutes from './routes/tenant.routes.js';
+import eventRoutes  from './routes/events.routes.js';
 
 dotenv.config();
 
@@ -50,23 +50,24 @@ app.use((req, res, next) => {
 
 /* ───────────── routes ───────────── */
 app.get('/', (_req, res) => res.send('EVMS API Running 🚀'));
+app.get('/health', (_req, res) => res.status(200).json({ status: 'ok', service: 'Event and Venue Service', timestamp: new Date().toISOString() }));
 
 app.use('/api', venueRoutes);   // includes /venues/:id/image
 app.use('/api', tenantRoutes);  // tenant management routes
 app.use('/api', eventRoutes);
 
 /* ───────────── server ───────────── */
-const PORT = process.env.PORT || 8000;
-
-export default app;
+const PORT = process.env.PORT || 8080;
 
 if (process.env.NODE_ENV !== 'test') {
-  const server = app.listen(PORT, () => {
-    console.log(`🚀  EVMS server running on port ${PORT}`);
+  app.listen(PORT, () => {
+    console.log(`🚀 EVMS server running on port ${PORT}`);
   });
   
-  // Increase server timeout to handle large requests
-  server.timeout = 120000; // 120 seconds
-  server.keepAliveTimeout = 65000; // 65 seconds
-  server.headersTimeout = 66000; // 66 seconds
+  // // Increase server timeout to handle large requests
+  // server.timeout = 120000; // 120 seconds
+  // server.keepAliveTimeout = 65000; // 65 seconds
+  // server.headersTimeout = 66000; // 66 seconds
 }
+
+export default app;
