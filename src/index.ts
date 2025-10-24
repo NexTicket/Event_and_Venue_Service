@@ -7,6 +7,7 @@ import dotenv from 'dotenv';
 import venueRoutes  from './routes/venue.routes.js';
 import tenantRoutes from './routes/tenant.routes.js';
 import eventRoutes  from './routes/events.routes.js';
+import { cache } from './utils/cache.js';
 
 dotenv.config();
 
@@ -53,7 +54,25 @@ const PORT = process.env.PORT || 8000;
 export default app;
 
 if (process.env.NODE_ENV !== 'test') {
+  // Initialize Redis cache
+  cache.connect().then(() => {
+    if (cache.isConnected()) {
+      console.log('✅ Redis cache enabled');
+    } else {
+      console.log('⚠️  Redis cache disabled - running without cache');
+    }
+  }).catch((err) => {
+    console.error('⚠️  Redis connection failed, running without cache:', err.message);
+  });
+
   app.listen(PORT, () => {
     console.log(`🚀  EVMS server running on port ${PORT}`);
+  });
+
+  // Graceful shutdown
+  process.on('SIGTERM', async () => {
+    console.log('SIGTERM received, closing server...');
+    await cache.disconnect();
+    process.exit(0);
   });
 }
