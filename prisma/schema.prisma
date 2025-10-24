@@ -15,6 +15,9 @@ model Tenant {
   firebaseUid String?  @unique
   venues      Venue[]
   events      events[]
+
+  @@index([firebaseUid])
+  @@index([createdAt])
 }
 
 model Venue {
@@ -38,6 +41,12 @@ model Venue {
   type          String?
   tenant        Tenant   @relation(fields: [tenantId], references: [id])
   events        events[]
+
+  @@index([tenantId])
+  @@index([ownerUid])
+  @@index([type])
+  @@index([capacity])
+  @@index([latitude, longitude])
 }
 
 model events {
@@ -59,6 +68,18 @@ model events {
   eventAdminUid      String?
   Tenant             Tenant      @relation(fields: [tenantId], references: [id])
   venue              Venue?      @relation(fields: [venueId], references: [id])
+
+  @@index([status])
+  @@index([venueId])
+  @@index([tenantId])
+  @@index([category])
+  @@index([startDate])
+  @@index([endDate])
+  @@index([eventAdminUid])
+  @@index([status, startDate])
+  @@index([status, category])
+  @@index([venueId, status])
+  @@index([created_at])
 }
 
 enum EventStatus {

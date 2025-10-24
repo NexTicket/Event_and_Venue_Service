@@ -1,6 +1,7 @@
 import { PrismaClient } from "@prisma/client";
 import { Request,Response } from 'express';
 import cloudinary from '../utils/cloudinary.js';
+import { cache, CacheKeys, CacheTTL, invalidateEventCache } from '../utils/cache.js';
 // Removed: import { ensureTenantExists } from '../utils/autoCreateTenant.js';
 // Now using User-Service API for tenant operations
 
@@ -24,25 +25,63 @@ const ensureTenantViaUserService = async (user: any, authToken: string) => {
       return null;
     }
 
-    const result = await response.json();
-    console.log('📦 User Service response:', JSON.stringify(result, null, 2));
-    
-    // Handle the User Service response structure
-    // Response is: { data: { tenantId, userRole, tenantName } }
-    if (result.data && result.data.tenantId) {
-      console.log('✅ Tenant ID extracted from User Service:', result.data.tenantId);
-      return { id: result.data.tenantId }; // Normalize to expected structure
-    }
-    
-    // Fallback: check if data itself is a tenant object
-    const tenant = result.data || result.tenant || result;
-    if (tenant && tenant.id) {
-      console.log('✅ Tenant found with id:', tenant.id);
-      return tenant;
-    }
-    
-    console.error('❌ Invalid tenant data received:', result);
-    return null;
+        const result = await response.json();
+        console.log('📦 User Service response:', JSON.stringify(result, null, 2));
+
+        // Try several possible response shapes from User-Service / Event-Service
+        // 1) { data: { tenantId: number, ... } }
+        // 2) { data: { tenant: { id: number, ... } } }
+        // 3) { tenant: { id: number, ... } }
+        // 4) { tenantId: number }
+        // 5) { data: { requiresTenant: false } } -> fall back to local tenant creation
+
+        // Normalize tenant when possible
+        let tenant: any = null;
+
+        if (result && typeof result === 'object') {
+            if (result.data && result.data.tenantId) {
+                tenant = { id: result.data.tenantId };
+            } else if (result.data && result.data.tenant && result.data.tenant.id) {
+                tenant = result.data.tenant;
+            } else if (result.tenant && result.tenant.id) {
+                tenant = result.tenant;
+            } else if (result.tenantId) {
+                tenant = { id: result.tenantId };
+            }
+        }
+
+        if (tenant && tenant.id) {
+            console.log('✅ Tenant extracted from User Service response:', tenant.id);
+            return tenant;
+        }
+
+        // If User-Service explicitly says no tenant required, return null so caller can decide
+        if (result && result.data && result.data.requiresTenant === false) {
+            console.log('ℹ️ User-Service indicates tenant not required for this role');
+            return null;
+        }
+
+        // As a last-resort fallback: try to find/create tenant locally in Event Service DB
+        try {
+            console.log('🔁 Falling back to local tenant lookup/create for user:', user.uid);
+            const prisma = getPrisma();
+
+            // Try to find existing tenant by firebaseUid
+            let localTenant = await prisma.tenant.findUnique({ where: { firebaseUid: user.uid } });
+
+            if (!localTenant) {
+                const tenantName = user.name || user.email || `${user.role} User`;
+                localTenant = await prisma.tenant.create({ data: { name: tenantName, firebaseUid: user.uid } });
+                console.log('✅ Created local tenant as fallback:', localTenant.id);
+            } else {
+                console.log('✅ Found local tenant as fallback:', localTenant.id);
+            }
+
+            return localTenant;
+        } catch (fallbackError) {
+            console.error('❌ Fallback local tenant creation failed:', fallbackError);
+            return null;
+        }
   } catch (error) {
     console.error('❌ Error calling User-Service for tenant:', error);
     return null;
@@ -73,18 +112,27 @@ export const getAllEvents = async (req: Request , res: Response) => {
     try {
         // Get status from query parameter
         const status = req.query.status as string;
+        const category = req.query.category as string;
         const user = req.user;
         const { role } = user || {};
         
-        // Debug logging
-        console.log('🔍 getAllEvents - Request headers:', {
-            'x-user-id': req.headers['x-user-id'],
-            'x-user-email': req.headers['x-user-email'],
-            'x-user-role': req.headers['x-user-role']
-        });
-        console.log('🔍 getAllEvents - User object:', user);
-        console.log('🔍 getAllEvents - Extracted role:', role);
-        console.log('🔍 getAllEvents - Requested status:', status);
+        // PERFORMANCE: Only log in development or on errors
+        const isDev = process.env.NODE_ENV === 'development';
+        
+        // Check cache first
+        const cacheKey = CacheKeys.allEvents(status, category);
+        const cachedEvents = await cache.get(cacheKey);
+        
+        if (cachedEvents) {
+            if (isDev) console.log('✅ Cache HIT:', cacheKey);
+            return res.status(200).json({
+                data: cachedEvents,
+                message: "Events fetched successfully (cached)",
+                cached: true
+            });
+        }
+        
+        if (isDev) console.log('❌ Cache MISS:', cacheKey);
         
         // Build where clause based on status parameter and user role
         const whereClause: any = {};
@@ -93,10 +141,9 @@ export const getAllEvents = async (req: Request , res: Response) => {
             // If status is explicitly requested
             if (status.toUpperCase() === 'PENDING' && role !== 'admin') {
                 // Only admins can request PENDING events
-                console.log('❌ 403 Forbidden - role is not admin:', role);
+                if (isDev) console.log('❌ 403 Forbidden - role is not admin:', role);
                 return res.status(403).json({ 
-                    error: 'Not authorized to view pending events',
-                    debug: { role, status }
+                    error: 'Not authorized to view pending events'
                 });
             }
             whereClause.status = status.toUpperCase();
@@ -111,7 +158,9 @@ export const getAllEvents = async (req: Request , res: Response) => {
             }
         }
 
-        console.log('🔍 getAllEvents called by role:', role || 'public', 'status filter:', status || 'default');
+        if (category) {
+            whereClause.category = category;
+        }
 
         const events = await getPrisma().events.findMany({
             where: whereClause,
@@ -151,10 +200,13 @@ export const getAllEvents = async (req: Request , res: Response) => {
             }
         });
 
-        console.log(`📊 Found ${events.length} events for role: ${role || 'public'}`);
+        // Cache the results for 5 minutes
+        await cache.set(cacheKey, events, CacheTTL.MEDIUM);
+        
         res.status(200).json({
             data: events,
-            message: "Events fetched successfully"
+            message: "Events fetched successfully",
+            cached: false
         });
     } catch (error) {
         console.error('Failed to fetch events:', error);
@@ -423,21 +475,37 @@ export const addEvent = async (req: Request, res: Response) => {
 
     try {
         console.log('🏢 Ensuring tenant exists for user:', user.uid);
-        // Ensure user has a tenant record via User-Service
-        const authToken = req.headers.authorization?.replace('Bearer ', '') || '';
-        const tenant = await ensureTenantViaUserService(user, authToken);
+        
+        // Ensure user has a tenant record - create locally if needed
+        let tenant = await getPrisma().tenant.findUnique({
+            where: { firebaseUid: user.uid }
+        });
+
+        if (!tenant) {
+            // Create tenant locally
+            const tenantName = user.name || user.email || `${user.role} User`;
+            console.log('🏢 Creating new tenant for user:', user.uid, 'with name:', tenantName);
+            
+            tenant = await getPrisma().tenant.create({
+                data: {
+                    name: tenantName,
+                    firebaseUid: user.uid
+                }
+            });
+            
+            console.log('✅ Created new tenant:', tenant.id);
+        } else {
+            console.log('✅ Found existing tenant:', tenant.id);
+        }
         
         if (!tenant || !tenant.id) {
             console.log('❌ Failed to create/find tenant for user:', user.uid);
-            console.log('❌ Tenant data received:', tenant);
             return res.status(400).json({
                 error: 'Unable to create tenant for user',
                 userRole: user.role,
                 details: 'Tenant ID is missing or invalid'
             });
-        }
-        
-        console.log('✅ Tenant found/created:', tenant.id); 
+        } 
         
         // Parse dates properly - handle both date-only and full datetime strings
         const parseEventDate = (dateString: string) => {
@@ -590,8 +658,16 @@ export const updateEvent = async (req: Request, res: Response) => {
             return res.status(404).json({error: 'Event not found'});
         }
 
-        if((role === 'event_admin'|| role === 'organizer') && existing.Tenant?.firebaseUid !== uid){
+        // Authorization check:
+        // - admin role: can update any event
+        // - organizer role: can only update events from their own tenant
+        // - event_admin role: can only update events they are assigned to
+        if (role === 'organizer' && existing.Tenant?.firebaseUid !== uid) {
             return res.status(403).json({error: 'You are not authorized to update this event'})
+        }
+        
+        if (role === 'event_admin' && existing.eventAdminUid !== uid) {
+            return res.status(403).json({error: 'You are not authorized to update this event. Only assigned event admins can edit this event.'})
         }
 
         // Build update data object, only including fields that are provided
@@ -621,6 +697,9 @@ export const updateEvent = async (req: Request, res: Response) => {
                 venue: true
             }
         })
+
+        // Invalidate cache
+        await invalidateEventCache(eventId.toString(), updated.venueId?.toString(), updated.Tenant?.id.toString());
 
         res.status(200).json({
             data: updated,
@@ -653,6 +732,9 @@ export const deleteEvent = async ( req: Request , res: Response ) => {
         await getPrisma().events.delete({
             where : { id : eventId}
         })
+
+        // Invalidate cache
+        await invalidateEventCache(eventId.toString(), existing.venueId?.toString(), existing.Tenant?.id.toString());
 
         res.status(200).json({message:'Event deleted successfully'})
     }catch(error){

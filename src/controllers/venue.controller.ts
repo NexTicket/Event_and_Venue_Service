@@ -1,5 +1,6 @@
 import { PrismaClient } from "@prisma/client";
 import type {Request, Response} from 'express';
+import { cache, CacheKeys, CacheTTL, invalidateVenueCache } from '../utils/cache.js';
 // import { setUserRole } from "../utils/userRoles.js";
 // Removed: import { ensureTenantExists } from '../utils/autoCreateTenant.js';
 // Now using User-Service API for tenant operations
@@ -58,19 +59,30 @@ function getPrisma() {
 
 export const getAllVenues = async (req: Request, res: Response) => {
     try {
-        // This endpoint works for both authenticated and unauthenticated users
-        const user = req.user; // Will be undefined if not authenticated
-        console.log('👤 GetAllVenues - User:', user ? `${user.email} (${user.role})` : 'Public request');
+        // Check cache first
+        const cacheKey = CacheKeys.allVenues();
+        const cachedVenues = await cache.get(cacheKey);
         
+        if (cachedVenues) {
+            return res.status(200).json({
+                data: cachedVenues,
+                message: "Venues fetched successfully (cached)",
+                cached: true
+            });
+        }
+        
+        // This endpoint works for both authenticated and unauthenticated users
         const venues = await(getPrisma().venue.findMany({
             include: {tenant: true}
         }));
         
-        console.log(`📍 Found ${venues.length} venues`);
+        // Cache for 5 minutes
+        await cache.set(cacheKey, venues, CacheTTL.MEDIUM);
         
         res.status(200).json({
             data : venues,
             message : "Venues fetched successfully",
+            cached: false
         })
 
     } catch(error) {
@@ -480,8 +492,6 @@ export const getVenuesByType = async (req: Request, res: Response) => {
             return res.status(400).json({ error: 'Venue type is required' });
         }
 
-        console.log('🔍 getVenuesByType called with type:', venueType);
-
         const venues = await getPrisma().venue.findMany({
             where: { 
                 type: venueType,
@@ -493,7 +503,6 @@ export const getVenuesByType = async (req: Request, res: Response) => {
             }
         });
 
-        console.log(`📊 Found ${venues.length} venues of type: ${venueType}`);
         res.status(200).json({
             data: venues,
             message: `Venues of type ${venueType} fetched successfully`
