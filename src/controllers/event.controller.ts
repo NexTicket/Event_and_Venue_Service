@@ -658,8 +658,16 @@ export const updateEvent = async (req: Request, res: Response) => {
             return res.status(404).json({error: 'Event not found'});
         }
 
-        if((role === 'event_admin'|| role === 'organizer') && existing.Tenant?.firebaseUid !== uid){
+        // Authorization check:
+        // - admin role: can update any event
+        // - organizer role: can only update events from their own tenant
+        // - event_admin role: can only update events they are assigned to
+        if (role === 'organizer' && existing.Tenant?.firebaseUid !== uid) {
             return res.status(403).json({error: 'You are not authorized to update this event'})
+        }
+        
+        if (role === 'event_admin' && existing.eventAdminUid !== uid) {
+            return res.status(403).json({error: 'You are not authorized to update this event. Only assigned event admins can edit this event.'})
         }
 
         // Build update data object, only including fields that are provided
